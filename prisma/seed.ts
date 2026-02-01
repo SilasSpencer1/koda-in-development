@@ -114,11 +114,12 @@ async function main() {
   });
 
   if (existingEvents.length > 0) {
+    const eventIds = existingEvents.map((e: { id: string }) => e.id);
     await prisma.attendee.deleteMany({
-      where: { eventId: { in: existingEvents.map((e) => e.id) } },
+      where: { eventId: { in: eventIds } },
     });
     await prisma.event.deleteMany({
-      where: { id: { in: existingEvents.map((e) => e.id) } },
+      where: { id: { in: eventIds } },
     });
     console.log('  Cleaned up existing events');
   }
