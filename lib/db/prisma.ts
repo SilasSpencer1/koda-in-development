@@ -6,7 +6,7 @@ import { Pool } from 'pg';
 // https://www.prisma.io/docs/guides/performance-and-optimization/connection-management
 
 const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
+  prisma: InstanceType<typeof PrismaClient> | undefined;
 };
 
 function createPrismaClient() {
@@ -34,4 +34,5 @@ if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.prisma = prisma;
 }
 
+export type { PrismaClient };
 export default prisma;

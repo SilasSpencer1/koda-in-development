@@ -1,6 +1,16 @@
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
 
-const prisma = new PrismaClient();
+// Create Prisma client with PostgreSQL adapter for Prisma 7
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) {
+  throw new Error('DATABASE_URL environment variable is not set');
+}
+
+const pool = new Pool({ connectionString: databaseUrl });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
   console.log('Starting seed...');
@@ -222,9 +232,11 @@ async function main() {
 main()
   .then(async () => {
     await prisma.$disconnect();
+    await pool.end();
   })
-  .catch(async (e) => {
-    console.error('Seed failed:', e);
+  .catch(async (error: unknown) => {
+    console.error('Seed failed:', error);
     await prisma.$disconnect();
+    await pool.end();
     process.exit(1);
   });

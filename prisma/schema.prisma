@@ -116,7 +116,8 @@ model Friendship {
   requester User @relation("FriendshipRequester", fields: [requesterId], references: [id], onDelete: Cascade)
   addressee User @relation("FriendshipAddressee", fields: [addresseeId], references: [id], onDelete: Cascade)
 
-  // Prevent duplicate friendships (A->B and B->A should not both exist)
+  // Prevent duplicate friend requests from the same requester to the same addressee
+  // Note: This does NOT prevent bidirectional friendships (A->B and B->A can both exist)
   @@unique([requesterId, addresseeId])
   @@index([requesterId])
   @@index([addresseeId])
