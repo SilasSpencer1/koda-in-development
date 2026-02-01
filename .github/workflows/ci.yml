@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Run linter
+        run: pnpm lint
+
+      - name: Run type check
+        run: pnpm typecheck
+
+      - name: Run tests with coverage
+        run: pnpm test:coverage
+
+      - name: Check test coverage threshold
+        run: |
+          COVERAGE=$(cat coverage/coverage-final.json | grep -o '"lines":[^}]*' | grep -o '[0-9]\+\.[0-9]*' | head -1)
+          THRESHOLD=93
+          if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
+            echo "Test coverage $COVERAGE% is below threshold of $THRESHOLD%"
+            exit 1
+          fi
+          echo "Test coverage $COVERAGE% meets threshold of $THRESHOLD%"
