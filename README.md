@@ -8,6 +8,7 @@ Koda is a privacy-first social calendar that helps friends coordinate plans and 
 
 - Node.js 20+ (see `.nvmrc`)
 - pnpm (recommended)
+- Supabase account (free tier works)
 
 ### Installation
 
@@ -17,7 +18,41 @@ pnpm install
 
 # Set up git hooks (pre-commit)
 pnpm husky
+
+# Copy environment variables
+cp .env.example .env.local
+# Then edit .env.local with your Supabase credentials
 ```
+
+### Database Setup
+
+Koda uses Prisma with Supabase Postgres. Before running the app:
+
+1. **Create a Supabase project** at [supabase.com](https://supabase.com)
+
+2. **Get your database credentials** from Supabase Dashboard:
+   - `DATABASE_URL`: Settings > Database > Connection string (use "Transaction" mode for Prisma)
+   - `SUPABASE_URL`: Settings > API > Project URL
+   - `SUPABASE_SERVICE_ROLE_KEY`: Settings > API > service_role key
+
+3. **Set up Supabase Storage** for avatar uploads:
+   - Go to Storage in your Supabase Dashboard
+   - Create a bucket named `avatars`
+   - Set the bucket as **public** (for public avatar URLs)
+   - Or keep it private and the app will use signed URLs
+
+4. **Run database migrations**:
+
+   ```bash
+   # Generate Prisma client
+   pnpm db:generate
+
+   # Run migrations (creates tables)
+   pnpm db:migrate
+
+   # Seed the database with sample data
+   pnpm db:seed
+   ```
 
 ### Development
 
@@ -30,6 +65,28 @@ pnpm build
 
 # Start production server
 pnpm start
+```
+
+### Database Commands
+
+```bash
+# Run migrations in development (creates migration files)
+pnpm db:migrate
+
+# Deploy migrations to production (applies existing migrations)
+pnpm db:migrate:prod
+
+# Seed the database with sample data
+pnpm db:seed
+
+# Open Prisma Studio (database GUI)
+pnpm db:studio
+
+# Push schema changes directly (skip migrations, useful for prototyping)
+pnpm db:push
+
+# Regenerate Prisma client after schema changes
+pnpm db:generate
 ```
 
 ## Tooling & Scripts
@@ -60,6 +117,41 @@ pnpm test
 pnpm test:coverage
 ```
 
+### Avatar Upload API
+
+Upload user avatars to Supabase Storage via the `/api/uploads/avatar` endpoint.
+
+**Endpoint**: `POST /api/uploads/avatar`
+
+**Headers**:
+
+- `Content-Type: multipart/form-data`
+- `x-dev-user-email: user@example.com` (development auth placeholder)
+
+**Body**: Form data with field `file` containing the image
+
+**Supported formats**: JPEG, PNG, GIF, WebP (max 5MB)
+
+**Example with curl**:
+
+```bash
+# Upload an avatar (development mode with x-dev-user-email header)
+curl -X POST http://localhost:3000/api/uploads/avatar \
+  -H "x-dev-user-email: alice@example.com" \
+  -F "file=@/path/to/avatar.png"
+
+# Response: { "url": "https://your-project.supabase.co/storage/v1/object/public/avatars/alice@example.com/1234567890-avatar.png" }
+```
+
+**Response codes**:
+
+- `200`: Success, returns `{ url: string }`
+- `400`: Missing file or invalid file type/size
+- `401`: Missing authentication
+- `500`: Upload failed
+
+**Note**: The endpoint currently uses a development placeholder (`x-dev-user-email` header) for authentication. In production, this will be replaced with proper session-based auth.
+
 ## Code Style & Configuration
 
 - **Language**: TypeScript (strict mode)
@@ -74,6 +166,9 @@ pnpm test:coverage
 ```
 .
 ├── app/                    # Next.js App Router
+│   ├── api/               # API routes
+│   │   └── uploads/       # File upload endpoints
+│   │       └── avatar/    # Avatar upload endpoint
 │   ├── layout.tsx         # Root layout with navigation
 │   ├── page.tsx           # Landing page
 │   └── globals.css        # Global styles
@@ -81,13 +176,20 @@ pnpm test:coverage
 │   ├── ui/                # shadcn/ui components
 │   └── ...                # Feature components
 ├── lib/
-│   ├── utils.ts           # Shared utilities
-│   └── ...                # Feature modules (auth, db, etc.)
+│   ├── db/                # Database utilities
+│   │   └── prisma.ts      # Prisma client singleton
+│   ├── supabase/          # Supabase utilities
+│   │   └── server.ts      # Server-side Supabase client
+│   └── utils.ts           # Shared utilities
+├── prisma/
+│   ├── schema.prisma      # Database schema
+│   └── seed.ts            # Seed data script
 ├── tests/                 # Unit & integration tests
+│   └── api/               # API route tests
 ├── .github/workflows/     # GitHub Actions CI
-├── .husky/               # Git hooks
-├── vitest.config.ts      # Test runner config
-└── next.config.ts        # Next.js config
+├── .husky/                # Git hooks
+├── vitest.config.mjs      # Test runner config
+└── next.config.ts         # Next.js config
 ```
 
 ## Continuous Integration
