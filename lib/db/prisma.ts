@@ -6,7 +6,8 @@ import { Pool } from 'pg';
 // https://www.prisma.io/docs/guides/performance-and-optimization/connection-management
 
 const globalForPrisma = globalThis as unknown as {
-  prisma: InstanceType<typeof PrismaClient> | undefined;
+  prisma: PrismaClient | undefined;
+  pool: Pool | undefined;
 };
 
 function createPrismaClient() {
@@ -16,7 +17,11 @@ function createPrismaClient() {
   }
 
   // Prisma 7: Use driver adapter for PostgreSQL connection
-  const pool = new Pool({ connectionString: databaseUrl });
+  // Store pool in global to ensure only one pool exists across hot reloads
+  const pool =
+    globalForPrisma.pool ?? new Pool({ connectionString: databaseUrl });
+  globalForPrisma.pool = pool;
+
   const adapter = new PrismaPg(pool);
 
   return new PrismaClient({

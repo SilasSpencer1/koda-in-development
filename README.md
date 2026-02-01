@@ -38,8 +38,8 @@ Koda uses Prisma with Supabase Postgres. Before running the app:
 3. **Set up Supabase Storage** for avatar uploads:
    - Go to Storage in your Supabase Dashboard
    - Create a bucket named `avatars`
-   - Set the bucket as **public** (for public avatar URLs)
-   - Or keep it private and the app will use signed URLs
+   - Set the bucket as **public** (for direct public avatar URLs)
+   - Note: Private bucket support with signed URLs is not yet implemented; see [Future Enhancements](#avatar-upload-future-enhancements)
 
 4. **Run database migrations**:
 
@@ -281,3 +281,45 @@ After Epic 0.1, the following features are planned:
 - **S6.0**: Event creation and invitations
 
 See `/docs/sprint-plan.md` for detailed roadmap.
+
+## Known Limitations & Future Enhancements
+
+### Avatar Upload Future Enhancements
+
+1. **Signed URLs for Private Buckets**
+   - Currently only supports public buckets with direct URLs
+   - Future: Implement `createSignedUrl()` for private buckets
+   - Allows fine-grained control over avatar accessibility
+
+2. **Robust File Validation**
+   - Currently validates MIME type only (client-provided)
+   - Future: Add magic byte verification + image library validation
+   - Prevents spoofed file types and security issues
+
+3. **Filename Sanitization**
+   - Currently: Simple character replacement creating collisions
+   - Future: Use UUID + preserve extension, or base64url encoding
+   - Prevents naming collisions and preserves metadata
+
+4. **Rate Limiting**
+   - Currently: No rate limiting on upload endpoint
+   - Future: Add per-user rate limiting to prevent abuse/DoS
+   - Protect against excessive storage consumption and costs
+
+### Database
+
+1. **Seed Data Dates**
+   - Currently uses hardcoded future dates (2026-02-05, etc.)
+   - Future: Use relative dates based on current time
+   - Makes seed data remain realistic over time
+
+2. **Connection Pool Management**
+   - Currently creates new Pool on each `createPrismaClient()` call
+   - Potential issue: Hot module reloads in development
+   - Future: Store pool in global object alongside Prisma client
+   - Ensure proper cleanup on process termination
+
+3. **Initial Migration**
+   - No `prisma/migrations` directory yet
+   - Developers must run `pnpm db:migrate` to create initial migration
+   - Future PRs should commit migrations for production deployments

@@ -124,15 +124,18 @@ async function main() {
     console.log('  Cleaned up existing events');
   }
 
-  // Create new events
+  // Create new events with dates relative to today
+  const today = new Date();
   const coffeeDate = await prisma.event.create({
     data: {
       ownerId: alice.id,
       title: 'Coffee with Bob',
       description: 'Weekly coffee catch-up',
       locationName: 'Blue Bottle Coffee, SF',
-      startAt: new Date('2026-02-05T10:00:00Z'),
-      endAt: new Date('2026-02-05T11:00:00Z'),
+      startAt: new Date(today.getTime() + 4 * 24 * 60 * 60 * 1000), // 4 days from now
+      endAt: new Date(
+        today.getTime() + 4 * 24 * 60 * 60 * 1000 + 60 * 60 * 1000
+      ), // +1 hour
       timezone: 'America/Los_Angeles',
       visibility: 'FRIENDS',
       coverMode: 'NONE',
@@ -147,8 +150,10 @@ async function main() {
       title: 'Team Lunch',
       description: 'Monthly team gathering',
       locationName: 'The Italian Place',
-      startAt: new Date('2026-02-10T12:00:00Z'),
-      endAt: new Date('2026-02-10T13:30:00Z'),
+      startAt: new Date(today.getTime() + 9 * 24 * 60 * 60 * 1000), // 9 days from now
+      endAt: new Date(
+        today.getTime() + 9 * 24 * 60 * 60 * 1000 + 90 * 60 * 1000
+      ), // +1.5 hours
       timezone: 'America/Los_Angeles',
       visibility: 'FRIENDS',
       coverMode: 'NONE',
@@ -162,8 +167,10 @@ async function main() {
       ownerId: alice.id,
       title: 'Dentist Appointment',
       locationName: "Dr. Smith's Office",
-      startAt: new Date('2026-02-08T14:00:00Z'),
-      endAt: new Date('2026-02-08T15:00:00Z'),
+      startAt: new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+      endAt: new Date(
+        today.getTime() + 7 * 24 * 60 * 60 * 1000 + 60 * 60 * 1000
+      ), // +1 hour
       timezone: 'America/Los_Angeles',
       visibility: 'PRIVATE',
       coverMode: 'BUSY_ONLY',

@@ -13,6 +13,18 @@ import { POST } from '../../../app/api/uploads/avatar/route';
  *   1. Set up Supabase environment variables
  *   2. Start the dev server: pnpm dev
  *   3. Use curl to test: see README for examples
+ *
+ * Test Coverage:
+ * - Authentication: Returns 401 when unauthenticated
+ * - File presence: Returns 400 when no file provided
+ * - File type validation: Currently only tests authentication path
+ * - File size validation: Currently only tests authentication path
+ *
+ * Note: Full file validation tests are excluded because they timeout when
+ * Supabase credentials are not configured. Integration tests should cover:
+ * - File type rejection (PDF, TXT, VIDEO)
+ * - File size rejection (>5MB)
+ * - File size acceptance (<5MB and exactly 5MB)
  */
 
 describe('Avatar Upload API', () => {
@@ -60,7 +72,7 @@ describe('Avatar Upload API', () => {
     });
   });
 
-  describe('File Validation', () => {
+  describe('File Validation - Basic Requirements', () => {
     it('returns 400 when no file is provided', async () => {
       const request = createMockRequest(null, {
         'x-dev-user-email': 'test@example.com',
