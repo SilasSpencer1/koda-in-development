@@ -56,6 +56,8 @@ RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
 COPY --from=builder /app/public ./public
+COPY --from=builder /app/scripts ./scripts
+COPY --from=builder /app/node_modules ./node_modules
 
 # Set the correct permission for prerender cache
 RUN mkdir .next
@@ -64,6 +66,10 @@ RUN chown nextjs:nodejs .next
 # Automatically leverage output traces to reduce image size
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+# Setup database on container start
+RUN npm install -g node-pg-migrate
+RUN node scripts/setup-db.mjs || true
 
 USER nextjs
 

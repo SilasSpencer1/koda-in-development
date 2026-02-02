@@ -19,7 +19,8 @@
     "db:studio": "prisma studio",
     "db:seed": "prisma db seed",
     "db:generate": "prisma generate",
-    "db:push": "prisma db push"
+    "db:push": "prisma db push",
+    "db:setup": "node scripts/setup-db.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
