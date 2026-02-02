@@ -10,6 +10,15 @@ export async function POST() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Defensive check: ensure user.id exists
+    if (!session.user.id) {
+      console.error('Session user missing id property');
+      return NextResponse.json(
+        { error: 'Invalid session state' },
+        { status: 500 }
+      );
+    }
+
     // Delete Google Account for this user
     const account = await prisma.account.findFirst({
       where: {

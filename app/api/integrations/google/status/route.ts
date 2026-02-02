@@ -10,6 +10,12 @@ export async function GET() {
       return NextResponse.json({ isConnected: false }, { status: 200 });
     }
 
+    // Defensive check: ensure user.id exists
+    if (!session.user.id) {
+      console.error('Session user missing id property');
+      return NextResponse.json({ isConnected: false }, { status: 200 });
+    }
+
     const googleAccount = await prisma.account.findFirst({
       where: {
         userId: session.user.id,

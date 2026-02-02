@@ -31,7 +31,8 @@ export default function IntegrationsPage() {
         isConnected: data.isConnected,
         loading: false,
       });
-    } catch {
+    } catch (error) {
+      console.error('Failed to check Google integration:', error);
       setGoogleIntegration({
         isConnected: false,
         loading: false,
@@ -67,7 +68,8 @@ export default function IntegrationsPage() {
       setMessage('Google account disconnected successfully');
       await checkGoogleIntegration();
       setTimeout(() => setMessage(''), 3000);
-    } catch {
+    } catch (error) {
+      console.error('Failed to disconnect Google account:', error);
       setMessage('An error occurred while disconnecting');
     } finally {
       setDisconnecting(false);
