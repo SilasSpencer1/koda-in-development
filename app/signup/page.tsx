@@ -97,9 +97,9 @@ export default function SignupPage() {
           </p>
         </div>
 
-        <div className="rounded-lg bg-white p-8 shadow-lg">
+        <div className="glass-panel rounded-lg p-8">
           {error && (
-            <div className="mb-4 rounded-md bg-red-50 p-4">
+            <div className="mb-4 rounded-md bg-red-50 p-4 backdrop-blur-sm">
               <p className="text-sm text-red-800">{error}</p>
             </div>
           )}
@@ -117,7 +117,7 @@ export default function SignupPage() {
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
+                className="glass-input mt-1 w-full rounded-md px-3 py-2"
                 required
               />
             </div>
@@ -135,7 +135,7 @@ export default function SignupPage() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="letters, numbers, underscores only"
-                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
+                className="glass-input mt-1 w-full rounded-md px-3 py-2"
                 required
               />
               <p className="mt-1 text-xs text-gray-500">
@@ -155,7 +155,7 @@ export default function SignupPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
+                className="glass-input mt-1 w-full rounded-md px-3 py-2"
                 required
               />
             </div>
@@ -172,7 +172,7 @@ export default function SignupPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
+                className="glass-input mt-1 w-full rounded-md px-3 py-2"
                 required
               />
               <p className="mt-1 text-xs text-gray-500">
@@ -192,7 +192,7 @@ export default function SignupPage() {
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
+                className="glass-input mt-1 w-full rounded-md px-3 py-2"
                 required
               />
             </div>
@@ -200,7 +200,7 @@ export default function SignupPage() {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700"
+              className="w-full bg-white text-blue-600 hover:bg-blue-50"
             >
               {loading ? 'Creating account...' : 'Sign up with Email'}
             </Button>
@@ -208,17 +208,17 @@ export default function SignupPage() {
 
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300" />
+              <div className="w-full border-t border-gray-300/40" />
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="bg-white px-2 text-gray-500">Or</span>
+              <span className="bg-transparent px-2 text-gray-500">Or</span>
             </div>
           </div>
 
           <Button
             onClick={handleGoogleSignUp}
             variant="outline"
-            className="w-full border-gray-300"
+            className="w-full border-blue-600 text-blue-600 hover:bg-blue-50"
           >
             <svg
               className="mr-2 h-5 w-5"
@@ -237,7 +237,7 @@ export default function SignupPage() {
             Already have an account?{' '}
             <Link
               href="/login"
-              className="text-blue-600 hover:text-blue-700 font-medium"
+              className="glass-link font-medium text-blue-600 hover:text-blue-700"
             >
               Sign in
             </Link>
