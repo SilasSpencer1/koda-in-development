@@ -1,9 +1,10 @@
-import { auth } from '@/lib/auth/config';
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 
-// Use NextAuth's auth as middleware wrapper
-export default auth((req) => {
-  const { pathname } = req.nextUrl;
+// Simple middleware - only checks cookie existence, no crypto usage
+// Actual session validation happens in server components
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
 
   // Public routes - anyone can access
   const publicRoutes = ['/', '/login', '/signup', '/api/auth'];
@@ -16,18 +17,22 @@ export default auth((req) => {
     return NextResponse.next();
   }
 
-  // Protected routes under /app - require authentication
+  // For protected routes, check for session cookie existence
+  // Actual session validation happens in the server components/API routes
   if (pathname.startsWith('/app')) {
-    if (!req.auth) {
-      const loginUrl = new URL('/login', req.url);
+    const sessionCookie =
+      request.cookies.get('authjs.session-token') ||
+      request.cookies.get('__Secure-authjs.session-token');
+
+    if (!sessionCookie) {
+      const loginUrl = new URL('/login', request.url);
       loginUrl.searchParams.set('callbackUrl', pathname);
       return NextResponse.redirect(loginUrl);
     }
-    return NextResponse.next();
   }
 
   return NextResponse.next();
-});
+}
 
 export const config = {
   matcher: [
