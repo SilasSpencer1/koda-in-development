@@ -6,7 +6,7 @@ Koda is a privacy-first social calendar that helps friends coordinate plans and 
 
 ### Prerequisites
 
-- Node.js 20+ (see `.nvmrc`)
+- Node.js **20.19.0+** (required by Prisma 7; see `.nvmrc`)
 - pnpm (recommended)
 - Supabase account (free tier works)
 
