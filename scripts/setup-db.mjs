@@ -4,7 +4,7 @@ const { Pool } = pg;
 
 async function setupDatabase() {
   const connectionString = process.env.DATABASE_URL;
-  
+
   if (!connectionString) {
     console.log('DATABASE_URL not set, skipping database setup');
     process.exit(0);

@@ -80,14 +80,15 @@ async function main() {
   }
   console.log('  Created/updated settings for all users');
 
-  // Create an accepted friendship between Alice and Bob
-  // Use a deterministic approach: always have the lower ID as requester
-  const [requesterId, addresseeId] = [alice.id, bob.id].sort();
+  // Create friendships to demonstrate different states
+
+  // 1. Alice <-> Bob: Accepted friendship
+  const [aliceBobRequesterId, aliceBobAddresseeId] = [alice.id, bob.id].sort();
   await prisma.friendship.upsert({
     where: {
       requesterId_addresseeId: {
-        requesterId,
-        addresseeId,
+        requesterId: aliceBobRequesterId,
+        addresseeId: aliceBobAddresseeId,
       },
     },
     update: {
@@ -96,14 +97,37 @@ async function main() {
       detailLevel: 'DETAILS',
     },
     create: {
-      requesterId,
-      addresseeId,
+      requesterId: aliceBobRequesterId,
+      addresseeId: aliceBobAddresseeId,
       status: 'ACCEPTED',
       canViewCalendar: true,
       detailLevel: 'DETAILS',
     },
   });
   console.log('  Created/updated friendship: Alice <-> Bob (accepted)');
+
+  // 2. Charlie -> Bob: Pending incoming request (for Bob)
+  const [charlieBobRequesterId, charlieBobAddresseeId] = [
+    charlie.id,
+    bob.id,
+  ].sort();
+  await prisma.friendship.upsert({
+    where: {
+      requesterId_addresseeId: {
+        requesterId: charlieBobRequesterId,
+        addresseeId: charlieBobAddresseeId,
+      },
+    },
+    update: {
+      status: 'PENDING',
+    },
+    create: {
+      requesterId: charlieBobRequesterId,
+      addresseeId: charlieBobAddresseeId,
+      status: 'PENDING',
+    },
+  });
+  console.log('  Created/updated friendship: Charlie -> Bob (pending)');
 
   // Create some events
   // First, delete existing events by these users to avoid duplicates
