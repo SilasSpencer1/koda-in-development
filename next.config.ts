@@ -4,6 +4,9 @@ const nextConfig: NextConfig = {
   /* Production optimizations */
   compress: true,
 
+  /* Standalone output for Docker deployments */
+  output: 'standalone',
+
   /* Image optimization */
   images: {
     unoptimized: false,
