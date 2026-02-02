@@ -34,6 +34,7 @@ Koda uses Prisma with Supabase Postgres. Before running the app:
    - `DATABASE_URL`: Settings > Database > Connection string (use "Transaction" mode for Prisma)
    - `SUPABASE_URL`: Settings > API > Project URL
    - `SUPABASE_SERVICE_ROLE_KEY`: Settings > API > service_role key
+   - Note: DATABASE_URL is configured in `prisma.config.ts` for Prisma 7 CLI commands
 
 3. **Set up Supabase Storage** for avatar uploads:
    - Go to Storage in your Supabase Dashboard
