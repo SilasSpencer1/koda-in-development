@@ -10,6 +10,7 @@ const adapter = PrismaAdapter(prisma);
 export const { auth, handlers, signIn, signOut } = NextAuth({
   adapter,
   trustHost: true,
+  baseUrl: process.env.NEXTAUTH_URL || `https://${process.env.RAILWAY_DOMAIN}`,
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID,

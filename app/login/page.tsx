@@ -50,9 +50,9 @@ function LoginForm() {
   };
 
   return (
-    <div className="rounded-lg bg-white p-8 shadow-lg">
+    <div className="glass-panel rounded-lg p-8">
       {error && (
-        <div className="mb-4 rounded-md bg-red-50 p-4">
+        <div className="mb-4 rounded-md bg-red-50 p-4 backdrop-blur-sm">
           <p className="text-sm text-red-800">{error}</p>
         </div>
       )}
@@ -70,7 +70,7 @@ function LoginForm() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
+            className="glass-input mt-1 w-full rounded-md px-3 py-2"
             required
           />
         </div>
@@ -87,7 +87,7 @@ function LoginForm() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
+            className="glass-input mt-1 w-full rounded-md px-3 py-2"
             required
           />
         </div>
@@ -103,17 +103,17 @@ function LoginForm() {
 
       <div className="relative my-6">
         <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-gray-300" />
+          <div className="w-full border-t border-gray-300/40" />
         </div>
         <div className="relative flex justify-center text-sm">
-          <span className="bg-white px-2 text-gray-500">Or</span>
+          <span className="bg-transparent px-2 text-gray-500">Or</span>
         </div>
       </div>
 
       <Button
         onClick={handleGoogleSignIn}
         variant="outline"
-        className="w-full border-gray-300"
+        className="w-full border-blue-600 text-blue-600 hover:bg-blue-50"
       >
         <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
           <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -128,7 +128,7 @@ function LoginForm() {
         Don&apos;t have an account?{' '}
         <Link
           href="/signup"
-          className="font-medium text-blue-600 hover:text-blue-700"
+          className="glass-link font-medium text-blue-600 hover:text-blue-700"
         >
           Sign up
         </Link>
@@ -139,11 +139,11 @@ function LoginForm() {
 
 function LoginFormFallback() {
   return (
-    <div className="rounded-lg bg-white p-8 shadow-lg">
+    <div className="glass-panel rounded-lg p-8">
       <div className="animate-pulse space-y-4">
-        <div className="h-10 rounded bg-gray-200" />
-        <div className="h-10 rounded bg-gray-200" />
-        <div className="h-10 rounded bg-gray-200" />
+        <div className="h-10 rounded bg-gray-200/30" />
+        <div className="h-10 rounded bg-gray-200/30" />
+        <div className="h-10 rounded bg-gray-200/30" />
       </div>
     </div>
   );
