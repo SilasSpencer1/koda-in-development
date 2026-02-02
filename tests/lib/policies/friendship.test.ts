@@ -3,6 +3,10 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   sanitizeUserForSearch,
   canSearchSeeUser,
+  isBlocked,
+  areFriends,
+  validateFriendRequestCreation,
+  getRelationshipStatus,
 } from '@/lib/policies/friendship';
 import { prisma } from '@/lib/db/prisma';
 
@@ -72,6 +76,58 @@ describe('Friendship Policies - Core Functions', () => {
     });
   });
 
+  describe('isBlocked', () => {
+    it('should return true if requester blocked target', async () => {
+      const mockPrisma = prisma as any;
+      mockPrisma.friendship.findFirst.mockResolvedValue({ status: 'BLOCKED' });
+
+      const result = await isBlocked('user1', 'user2');
+      expect(result).toBe(true);
+    });
+
+    it('should return true if target blocked requester', async () => {
+      const mockPrisma = prisma as any;
+      mockPrisma.friendship.findFirst.mockResolvedValue({ status: 'BLOCKED' });
+
+      const result = await isBlocked('user2', 'user1');
+      expect(result).toBe(true);
+    });
+
+    it('should return false if no block exists', async () => {
+      const mockPrisma = prisma as any;
+      mockPrisma.friendship.findFirst.mockResolvedValue(null);
+
+      const result = await isBlocked('user1', 'user2');
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('areFriends', () => {
+    it('should return true if accepted friends', async () => {
+      const mockPrisma = prisma as any;
+      mockPrisma.friendship.findFirst.mockResolvedValue({ status: 'ACCEPTED' });
+
+      const result = await areFriends('user1', 'user2');
+      expect(result).toBe(true);
+    });
+
+    it('should return false if not friends', async () => {
+      const mockPrisma = prisma as any;
+      mockPrisma.friendship.findFirst.mockResolvedValue(null);
+
+      const result = await areFriends('user1', 'user2');
+      expect(result).toBe(false);
+    });
+
+    it('should return true if accepted (bidirectional)', async () => {
+      const mockPrisma = prisma as any;
+      mockPrisma.friendship.findFirst.mockResolvedValue({ status: 'ACCEPTED' });
+
+      const result = await areFriends('user2', 'user1');
+      expect(result).toBe(true);
+    });
+  });
+
   describe('canSearchSeeUser', () => {
     it('should return true for PUBLIC users when not blocked', async () => {
       const mockPrisma = prisma as any;
@@ -91,22 +147,196 @@ describe('Friendship Policies - Core Functions', () => {
       expect(result).toBe(false);
     });
 
-    it('should check friendship for PRIVATE visibility', async () => {
+    it('should show PRIVATE to friends only', async () => {
       const mockPrisma = prisma as any;
-      let callCount = 0;
-      mockPrisma.friendship.findFirst.mockImplementation(() => {
-        callCount++;
-        if (callCount === 1) {
-          // First call: block check
-          return Promise.resolve(null);
-        }
-        // Second call: friend check
-        return Promise.resolve(null);
-      });
+      mockPrisma.friendship.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ status: 'ACCEPTED' });
+
+      const result = await canSearchSeeUser('searcher', 'target', 'PRIVATE');
+      expect(result).toBe(true);
+    });
+
+    it('should hide PRIVATE from non-friends', async () => {
+      const mockPrisma = prisma as any;
+      mockPrisma.friendship.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null);
 
       const result = await canSearchSeeUser('searcher', 'target', 'PRIVATE');
       expect(result).toBe(false);
-      expect(mockPrisma.friendship.findFirst).toHaveBeenCalledTimes(2);
+    });
+
+    it('should show FRIENDS_ONLY to friends only', async () => {
+      const mockPrisma = prisma as any;
+      mockPrisma.friendship.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ status: 'ACCEPTED' });
+
+      const result = await canSearchSeeUser(
+        'searcher',
+        'target',
+        'FRIENDS_ONLY'
+      );
+      expect(result).toBe(true);
+    });
+
+    it('should hide FRIENDS_ONLY from non-friends', async () => {
+      const mockPrisma = prisma as any;
+      mockPrisma.friendship.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null);
+
+      const result = await canSearchSeeUser(
+        'searcher',
+        'target',
+        'FRIENDS_ONLY'
+      );
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('validateFriendRequestCreation', () => {
+    it('should reject self-requests', async () => {
+      const error = await validateFriendRequestCreation('user1', 'user1');
+      expect(error).toBe('Cannot send friend request to yourself');
+    });
+
+    it('should reject if requester does not exist', async () => {
+      const mockPrisma = prisma as any;
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+
+      const error = await validateFriendRequestCreation('nonexistent', 'user2');
+      expect(error).toBe('User not found');
+    });
+
+    it('should reject if addressee does not exist', async () => {
+      const mockPrisma = prisma as any;
+      mockPrisma.user.findUnique
+        .mockResolvedValueOnce({ id: 'user1' })
+        .mockResolvedValueOnce(null);
+
+      const error = await validateFriendRequestCreation('user1', 'nonexistent');
+      expect(error).toBe('User not found');
+    });
+
+    it('should reject if already friends', async () => {
+      const mockPrisma = prisma as any;
+      mockPrisma.user.findUnique
+        .mockResolvedValueOnce({ id: 'user1' })
+        .mockResolvedValueOnce({ id: 'user2' });
+      mockPrisma.friendship.findFirst.mockResolvedValueOnce({
+        status: 'ACCEPTED',
+      });
+
+      const error = await validateFriendRequestCreation('user1', 'user2');
+      expect(error).toBe('Already friends with this user');
+    });
+
+    it('should reject if blocked', async () => {
+      const mockPrisma = prisma as any;
+      mockPrisma.user.findUnique
+        .mockResolvedValueOnce({ id: 'user1' })
+        .mockResolvedValueOnce({ id: 'user2' });
+      mockPrisma.friendship.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ status: 'BLOCKED' });
+
+      const error = await validateFriendRequestCreation('user1', 'user2');
+      expect(error).toBe('Cannot send request to blocked user');
+    });
+
+    it('should reject if request pending', async () => {
+      const mockPrisma = prisma as any;
+      mockPrisma.user.findUnique
+        .mockResolvedValueOnce({ id: 'user1' })
+        .mockResolvedValueOnce({ id: 'user2' });
+      mockPrisma.friendship.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ status: 'PENDING' });
+
+      const error = await validateFriendRequestCreation('user1', 'user2');
+      expect(error).toBe('Friend request already pending');
+    });
+
+    it('should allow valid friend request', async () => {
+      const mockPrisma = prisma as any;
+      mockPrisma.user.findUnique
+        .mockResolvedValueOnce({ id: 'user1' })
+        .mockResolvedValueOnce({ id: 'user2' });
+      mockPrisma.friendship.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null);
+
+      const error = await validateFriendRequestCreation('user1', 'user2');
+      expect(error).toBeNull();
+    });
+  });
+
+  describe('getRelationshipStatus', () => {
+    it('should return none if blocked', async () => {
+      const mockPrisma = prisma as any;
+      mockPrisma.friendship.findFirst.mockResolvedValue({ status: 'BLOCKED' });
+
+      const status = await getRelationshipStatus('user1', 'user2');
+      expect(status).toBe('none');
+    });
+
+    it('should return pending_outgoing for outgoing request', async () => {
+      const mockPrisma = prisma as any;
+      mockPrisma.friendship.findFirst.mockResolvedValueOnce(null);
+      mockPrisma.friendship.findUnique.mockResolvedValueOnce({
+        status: 'PENDING',
+      });
+
+      const status = await getRelationshipStatus('user1', 'user2');
+      expect(status).toBe('pending_outgoing');
+    });
+
+    it('should return pending_incoming for incoming request', async () => {
+      const mockPrisma = prisma as any;
+      mockPrisma.friendship.findFirst.mockResolvedValueOnce(null);
+      mockPrisma.friendship.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ status: 'PENDING' });
+
+      const status = await getRelationshipStatus('user1', 'user2');
+      expect(status).toBe('pending_incoming');
+    });
+
+    it('should return friends for accepted', async () => {
+      const mockPrisma = prisma as any;
+      mockPrisma.friendship.findFirst.mockResolvedValueOnce(null);
+      mockPrisma.friendship.findUnique.mockResolvedValueOnce({
+        status: 'ACCEPTED',
+      });
+
+      const status = await getRelationshipStatus('user1', 'user2');
+      expect(status).toBe('friends');
+    });
+
+    it('should return none for no relationship', async () => {
+      const mockPrisma = prisma as any;
+      mockPrisma.friendship.findFirst.mockResolvedValueOnce(null);
+      mockPrisma.friendship.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null);
+
+      const status = await getRelationshipStatus('user1', 'user2');
+      expect(status).toBe('none');
+    });
+
+    it('should return friends for accepted incoming', async () => {
+      const mockPrisma = prisma as any;
+      mockPrisma.friendship.findFirst.mockResolvedValueOnce(null);
+      mockPrisma.friendship.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ status: 'ACCEPTED' });
+
+      const status = await getRelationshipStatus('user1', 'user2');
+      expect(status).toBe('friends');
     });
   });
 });

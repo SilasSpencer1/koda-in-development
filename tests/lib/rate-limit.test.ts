@@ -55,6 +55,25 @@ describe('Rate Limiting', () => {
       const clientId = getClientId(req);
       expect(clientId).toBe('192.168.1.100');
     });
+
+    it('should handle multiple forwarded IPs', () => {
+      const req = createMockRequest({
+        'x-forwarded-for': '203.0.113.1, 198.51.100.1, 192.0.2.1',
+      });
+
+      const clientId = getClientId(req);
+      expect(clientId).toBe('203.0.113.1');
+    });
+
+    it('should prioritize x-forwarded-for over x-real-ip', () => {
+      const req = createMockRequest({
+        'x-forwarded-for': '10.0.0.5',
+        'x-real-ip': '10.0.0.3',
+      });
+
+      const clientId = getClientId(req);
+      expect(clientId).toBe('10.0.0.5');
+    });
   });
 
   describe('checkRateLimit', () => {
@@ -109,6 +128,20 @@ describe('Rate Limiting', () => {
       expect(result3.success).toBe(true);
     });
 
+    it('should isolate rate limits per identifier', async () => {
+      const config = {
+        maxRequests: 1,
+        windowMs: 60000,
+        keyPrefix: 'rl-iso',
+      };
+
+      const result1 = await checkRateLimit('user-a', config);
+      expect(result1.success).toBe(true);
+
+      const result2 = await checkRateLimit('user-b', config);
+      expect(result2.success).toBe(true);
+    });
+
     it('should include valid reset time', async () => {
       const result = await checkRateLimit('test-reset-time', {
         maxRequests: 10,
@@ -132,6 +165,48 @@ describe('Rate Limiting', () => {
       expect(result).toHaveProperty('resetAt');
       expect(result).toHaveProperty('limit');
       expect(result.limit).toBe(3);
+    });
+
+    it('should decrement remaining count with each request', async () => {
+      const config = {
+        maxRequests: 3,
+        windowMs: 60000,
+        keyPrefix: 'decrement-test',
+      };
+
+      const result1 = await checkRateLimit('decr-user', config);
+      expect(result1.remaining).toBe(2);
+
+      const result2 = await checkRateLimit('decr-user', config);
+      expect(result2.remaining).toBe(1);
+
+      const result3 = await checkRateLimit('decr-user', config);
+      expect(result3.remaining).toBe(0);
+    });
+
+    it('should handle default keyPrefix', async () => {
+      const result = await checkRateLimit('default-prefix-user', {
+        maxRequests: 5,
+        windowMs: 10000,
+        // keyPrefix not specified, should use 'rl' as default
+      });
+
+      expect(result.limit).toBe(5);
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe('Rate Limit Header Helper', () => {
+    it('should correctly format rate limit metadata', async () => {
+      const result = await checkRateLimit('header-test', {
+        maxRequests: 10,
+        windowMs: 60000,
+        keyPrefix: 'header',
+      });
+
+      expect(result.limit).toBe(10);
+      expect(result.remaining).toBeLessThanOrEqual(10);
+      expect(result.resetAt).toBeGreaterThan(Date.now());
     });
   });
 });

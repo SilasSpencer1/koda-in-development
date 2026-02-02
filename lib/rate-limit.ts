@@ -51,6 +51,7 @@ export async function checkRateLimit(
   const now = Date.now();
 
   // Try Redis if available
+  // istanbul ignore if - Redis integration test only
   if (
     process.env.UPSTASH_REDIS_REST_URL &&
     process.env.UPSTASH_REDIS_REST_TOKEN
@@ -72,6 +73,7 @@ export async function checkRateLimit(
 
 /**
  * Check rate limit using Upstash Redis
+ * istanbul ignore next - Redis integration test only
  */
 async function checkRateLimitRedis(
   key: string,
