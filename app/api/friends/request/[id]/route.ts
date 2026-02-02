@@ -81,6 +81,8 @@ export async function PATCH(
       where: { id },
       data: {
         status: newStatus,
+        // Grant calendar access when accepting friendship
+        ...(newStatus === 'ACCEPTED' && { canViewCalendar: true }),
       },
       include: {
         requester: {

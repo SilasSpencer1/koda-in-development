@@ -210,7 +210,7 @@ export async function getRelationshipStatus(
     return 'none'; // Hide relationship status if blocked
   }
 
-  // Check outgoing request
+  // Check both directions for accepted friendship first (takes priority)
   const outgoing = await prisma.friendship.findUnique({
     where: {
       requesterId_addresseeId: {
@@ -221,15 +221,11 @@ export async function getRelationshipStatus(
     select: { status: true },
   });
 
-  if (outgoing?.status === 'PENDING') {
-    return 'pending_outgoing';
-  }
-
   if (outgoing?.status === 'ACCEPTED') {
     return 'friends';
   }
 
-  // Check incoming request
+  // Check incoming accepted (bidirectional acceptance)
   const incoming = await prisma.friendship.findUnique({
     where: {
       requesterId_addresseeId: {
@@ -240,12 +236,17 @@ export async function getRelationshipStatus(
     select: { status: true },
   });
 
-  if (incoming?.status === 'PENDING') {
-    return 'pending_incoming';
-  }
-
   if (incoming?.status === 'ACCEPTED') {
     return 'friends';
+  }
+
+  // Now check pending states only if not accepted
+  if (outgoing?.status === 'PENDING') {
+    return 'pending_outgoing';
+  }
+
+  if (incoming?.status === 'PENDING') {
+    return 'pending_incoming';
   }
 
   return 'none';

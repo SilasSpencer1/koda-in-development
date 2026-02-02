@@ -107,23 +107,20 @@ async function main() {
   console.log('  Created/updated friendship: Alice <-> Bob (accepted)');
 
   // 2. Charlie -> Bob: Pending incoming request (for Bob)
-  const [charlieBobRequesterId, charlieBobAddresseeId] = [
-    charlie.id,
-    bob.id,
-  ].sort();
+  // Important: Don't sort IDs for directional relationships - maintain request direction
   await prisma.friendship.upsert({
     where: {
       requesterId_addresseeId: {
-        requesterId: charlieBobRequesterId,
-        addresseeId: charlieBobAddresseeId,
+        requesterId: charlie.id,
+        addresseeId: bob.id,
       },
     },
     update: {
       status: 'PENDING',
     },
     create: {
-      requesterId: charlieBobRequesterId,
-      addresseeId: charlieBobAddresseeId,
+      requesterId: charlie.id,
+      addresseeId: bob.id,
       status: 'PENDING',
     },
   });
