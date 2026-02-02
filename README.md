@@ -42,7 +42,14 @@ Koda uses Prisma with Supabase Postgres. Before running the app:
    - Set the bucket as **public** (for direct public avatar URLs)
    - Note: Private bucket support with signed URLs is not yet implemented; see [Future Enhancements](#avatar-upload-future-enhancements)
 
-4. **Run database migrations**:
+4. **Set up Google OAuth** (for authentication):
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - Create a new OAuth 2.0 credentials (OAuth consent screen + Credentials)
+   - Set redirect URI to `http://localhost:3000/api/auth/callback/google` (for local development)
+   - For production, add your domain's callback URL: `https://yourdomain.com/api/auth/callback/google`
+   - Get your `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
+
+5. **Run database migrations**:
 
    ```bash
    # Generate Prisma client
@@ -54,6 +61,32 @@ Koda uses Prisma with Supabase Postgres. Before running the app:
    # Seed the database with sample data
    pnpm db:seed
    ```
+
+### Authentication Setup
+
+Koda uses NextAuth.js v5 (beta) for authentication with two providers:
+
+- **Email + Password**: Users can sign up with email and password (bcryptjs hashing)
+- **Google OAuth**: Users can sign in with their Google account
+
+To configure authentication locally:
+
+1. Copy `.env.example` to `.env.local` and fill in:
+
+   ```bash
+   NEXTAUTH_URL=http://localhost:3000
+   NEXTAUTH_SECRET=<random_secret_32_chars_minimum>
+   GOOGLE_CLIENT_ID=<your_google_client_id>
+   GOOGLE_CLIENT_SECRET=<your_google_client_secret>
+   ```
+
+2. Generate a secure `NEXTAUTH_SECRET`:
+
+   ```bash
+   openssl rand -base64 32
+   ```
+
+3. Sessions are persisted to the database using Prisma adapter
 
 ### Development
 
@@ -168,8 +201,18 @@ curl -X POST http://localhost:3000/api/uploads/avatar \
 .
 ├── app/                    # Next.js App Router
 │   ├── api/               # API routes
-│   │   └── uploads/       # File upload endpoints
-│   │       └── avatar/    # Avatar upload endpoint
+│   │   ├── auth/          # NextAuth routes & signup
+│   │   │   ├── [...nextauth]/route.ts
+│   │   │   └── signup/    # Email/password signup endpoint
+│   │   └── integrations/  # Integration endpoints
+│   │       └── google/    # Google integration (connect/disconnect)
+│   ├── app/               # Protected authenticated area
+│   │   ├── settings/
+│   │   │   └── integrations/  # Google Calendar connect/disconnect UI
+│   │   ├── page.tsx       # Dashboard
+│   │   └── layout.tsx     # App layout with sidebar
+│   ├── login/             # Login page
+│   ├── signup/            # Signup page
 │   ├── layout.tsx         # Root layout with navigation
 │   ├── page.tsx           # Landing page
 │   └── globals.css        # Global styles
@@ -177,23 +220,117 @@ curl -X POST http://localhost:3000/api/uploads/avatar \
 │   ├── ui/                # shadcn/ui components
 │   └── ...                # Feature components
 ├── lib/
+│   ├── auth/              # Authentication
+│   │   ├── config.ts      # NextAuth configuration
+│   │   └── password.ts    # Password hashing utilities
 │   ├── db/                # Database utilities
 │   │   └── prisma.ts      # Prisma client singleton
 │   ├── supabase/          # Supabase utilities
 │   │   └── server.ts      # Server-side Supabase client
+│   ├── auth.ts            # Auth helpers (getSession, getCurrentUser)
 │   └── utils.ts           # Shared utilities
+├── middleware.ts          # Route protection middleware
 ├── prisma/
-│   ├── schema.prisma      # Database schema
+│   ├── schema.prisma      # Database schema (with auth models)
+│   ├── migrations/        # Database migrations
 │   └── seed.ts            # Seed data script
 ├── tests/                 # Unit & integration tests
-│   └── api/               # API route tests
+│   ├── api/               # API route tests
+│   │   └── integrations/  # Integration tests
+│   └── lib/               # Library tests
+│       └── auth/          # Auth utility tests
 ├── .github/workflows/     # GitHub Actions CI
 ├── .husky/                # Git hooks
 ├── vitest.config.mjs      # Test runner config
 └── next.config.ts         # Next.js config
 ```
 
-## Continuous Integration
+## Testing
+
+Run the test suite with:
+
+```bash
+# Run all tests
+pnpm test
+
+# Run tests with coverage
+pnpm test:coverage
+
+# Run tests in watch mode
+pnpm test --watch
+```
+
+Authentication tests include:
+
+- Password hashing and verification (bcryptjs)
+- Disconnect endpoint authorization
+- Smoke tests for signup and login flows
+
+## Authentication & Protected Routes
+
+### How It Works
+
+1. **Public Routes**: `/`, `/login`, `/signup`, `/api/auth/**`
+2. **Protected Routes**: `/app/**` — redirects to `/login` if not authenticated
+3. **Session Storage**: Database-backed sessions via Prisma adapter
+
+### Testing Login/Signup Flow
+
+#### Email + Password Signup:
+
+1. Navigate to `http://localhost:3000/signup`
+2. Create account with email/password (min 8 chars)
+3. Redirects to `/app` on success
+4. Password is hashed with bcryptjs (12 salt rounds)
+
+#### Email + Password Login:
+
+1. Navigate to `http://localhost:3000/login`
+2. Sign in with registered email/password
+3. Redirects to `/app`
+
+#### Google OAuth Login:
+
+1. Navigate to `/login` or `/signup`
+2. Click "Sign in/up with Google"
+3. Complete Google OAuth flow
+4. Redirects to `/app` on success
+5. Account row is created in database for token storage
+
+### Testing Integrations / Google Connect/Disconnect
+
+1. **When Logged In**: Navigate to `/app/settings/integrations`
+2. **Connect Google**:
+   - Click "Connect" button
+   - Complete Google OAuth flow
+   - Returns to `/app/settings/integrations`
+   - Status changes to "Connected"
+   - Google Account row stored in database with tokens
+3. **Disconnect Google**:
+   - Click "Disconnect" button
+   - Confirm in dialog
+   - Account row deleted from database
+   - Status changes to "Not connected"
+   - Tokens no longer available
+
+### Session Persistence
+
+Sessions persist across page refreshes. To test:
+
+1. Sign in at `/login`
+2. Navigate to `/app`
+3. Refresh page — still logged in
+4. Open developer tools > Application > Cookies
+5. Note `authjs.session-token` cookie
+
+### Protected Route Behavior
+
+To test route protection:
+
+1. Sign out (click "Sign out" in sidebar)
+2. Try accessing `/app` directly
+3. Redirected to `/login?callbackUrl=/app`
+4. After login, redirected back to `/app`
 
 GitHub Actions workflow runs on every PR and push to `main`:
 
