@@ -6,11 +6,7 @@ import {
   sanitizeUserForSearch,
   getRelationshipStatus,
 } from '@/lib/policies/friendship';
-import {
-  getClientId,
-  checkRateLimit,
-  setRateLimitHeaders,
-} from '@/lib/rate-limit';
+import { checkRateLimit, setRateLimitHeaders } from '@/lib/rate-limit';
 
 // Search rate limit: 30 requests per minute per client
 const SEARCH_RATE_LIMIT = {
@@ -29,9 +25,11 @@ export async function GET(req: NextRequest) {
 
     const currentUserId = session.user.id;
 
-    // Rate limit
-    const clientId = getClientId(req);
-    const rateLimitResult = await checkRateLimit(clientId, SEARCH_RATE_LIMIT);
+    // Rate limit per user (not IP) to prevent bypass via VPN/proxy changes
+    const rateLimitResult = await checkRateLimit(
+      currentUserId,
+      SEARCH_RATE_LIMIT
+    );
 
     if (!rateLimitResult.success) {
       const response = NextResponse.json(
