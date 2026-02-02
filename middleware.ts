@@ -1,10 +1,9 @@
 import { auth } from '@/lib/auth/config';
 import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
 
-export async function middleware(request: NextRequest) {
-  const session = await auth();
-  const { pathname } = request.nextUrl;
+// Use NextAuth's auth as middleware wrapper
+export default auth((req) => {
+  const { pathname } = req.nextUrl;
 
   // Public routes - anyone can access
   const publicRoutes = ['/', '/login', '/signup', '/api/auth'];
@@ -19,8 +18,8 @@ export async function middleware(request: NextRequest) {
 
   // Protected routes under /app - require authentication
   if (pathname.startsWith('/app')) {
-    if (!session) {
-      const loginUrl = new URL('/login', request.url);
+    if (!req.auth) {
+      const loginUrl = new URL('/login', req.url);
       loginUrl.searchParams.set('callbackUrl', pathname);
       return NextResponse.redirect(loginUrl);
     }
@@ -28,7 +27,7 @@ export async function middleware(request: NextRequest) {
   }
 
   return NextResponse.next();
-}
+});
 
 export const config = {
   matcher: [
@@ -37,7 +36,8 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
+     * - api/auth (NextAuth routes)
      */
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/auth).*)',
   ],
 };
