@@ -7,6 +7,9 @@ const nextConfig: NextConfig = {
   /* Standalone output for Docker deployments */
   output: 'standalone',
 
+  /* Exclude packages that use Node.js APIs from Edge bundling */
+  serverExternalPackages: ['bcryptjs', '@prisma/client'],
+
   /* Image optimization */
   images: {
     unoptimized: false,

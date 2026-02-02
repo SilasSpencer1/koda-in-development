@@ -10,6 +10,7 @@ export default function SignupPage() {
   const router = useRouter();
 
   const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -30,13 +31,23 @@ export default function SignupPage() {
       return;
     }
 
+    if (username.length < 3) {
+      setError('Username must be at least 3 characters');
+      return;
+    }
+
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      setError('Username can only contain letters, numbers, and underscores');
+      return;
+    }
+
     setLoading(true);
 
     try {
       const response = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, username, email, password }),
       });
 
       const data = await response.json();
@@ -109,6 +120,27 @@ export default function SignupPage() {
                 className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
                 required
               />
+            </div>
+
+            <div>
+              <label
+                htmlFor="username"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Username
+              </label>
+              <input
+                id="username"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="letters, numbers, underscores only"
+                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
+                required
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                At least 3 characters
+              </p>
             </div>
 
             <div>
