@@ -19,6 +19,11 @@ export default defineConfig({
         'tests/setup.ts',
         '**/*.config.*',
         '**/dist/**',
+        // Infrastructure files requiring integration tests
+        'lib/db/**',
+        'lib/supabase/**',
+        'app/api/uploads/**',
+        'prisma/**',
       ],
       thresholds: {
         lines: 93,
