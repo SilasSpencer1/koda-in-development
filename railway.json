@@ -12,7 +12,7 @@
   "nixpacks": {
     "providers": ["nodejs"],
     "variables": {
-      "NODEJS_VERSION": "20",
+      "NODEJS_VERSION": "20.19.0",
       "PNPM_VERSION": "10"
     }
   }
