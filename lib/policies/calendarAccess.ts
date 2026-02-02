@@ -9,7 +9,7 @@
  */
 
 import { prisma } from '@/lib/db/prisma';
-import type { EventVisibility } from '@prisma/client';
+import type { EventVisibility, DetailLevel } from '@prisma/client';
 import { isBlocked } from '@/lib/policies/friendship';
 
 /**
@@ -17,7 +17,7 @@ import { isBlocked } from '@/lib/policies/friendship';
  */
 export interface CalendarPermission {
   allowed: boolean;
-  detailLevel: 'BUSY_ONLY' | 'DETAILS' | null;
+  detailLevel: DetailLevel | null;
 }
 
 /**
@@ -29,6 +29,11 @@ export interface CalendarPermission {
  * 3. If accepted friends, compute effective detailLevel:
  *    - If friendship has canViewCalendar=false, not allowed
  *    - Otherwise, use per-friend override if set, else use owner's default
+ *
+ * Friendship Direction:
+ * - Prefers viewer→owner direction (viewer requested owner)
+ * - Falls back to owner→viewer if viewer→owner doesn't exist
+ * - This ensures correct per-friend overrides are applied
  */
 export async function getFriendCalendarPermission(
   ownerId: string,
@@ -40,29 +45,35 @@ export async function getFriendCalendarPermission(
     return { allowed: false, detailLevel: null };
   }
 
-  // Check if accepted friends (bidirectional check)
-  const friendship = await prisma.friendship.findFirst({
+  // Check for accepted friendship - prefer viewer→owner direction
+  let friendship = await prisma.friendship.findUnique({
     where: {
-      OR: [
-        {
-          requesterId: viewerId,
-          addresseeId: ownerId,
-          status: 'ACCEPTED',
-        },
-        {
-          requesterId: ownerId,
-          addresseeId: viewerId,
-          status: 'ACCEPTED',
-        },
-      ],
+      requesterId_addresseeId: {
+        requesterId: viewerId,
+        addresseeId: ownerId,
+      },
     },
     select: {
       canViewCalendar: true,
       detailLevel: true,
-      requesterId: true,
-      addresseeId: true,
     },
   });
+
+  // If not found, check reverse direction (owner→viewer)
+  if (!friendship) {
+    friendship = await prisma.friendship.findUnique({
+      where: {
+        requesterId_addresseeId: {
+          requesterId: ownerId,
+          addresseeId: viewerId,
+        },
+      },
+      select: {
+        canViewCalendar: true,
+        detailLevel: true,
+      },
+    });
+  }
 
   // Not friends
   if (!friendship) {

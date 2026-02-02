@@ -57,7 +57,10 @@ describe('Calendar Access Policy - Permissions', () => {
     const mockPrisma = prisma as any;
 
     mockIsBlocked.mockResolvedValue(false);
-    mockPrisma.friendship.findFirst.mockResolvedValue(null);
+    // First call: viewer→owner (returns null)
+    mockPrisma.friendship.findUnique.mockResolvedValueOnce(null);
+    // Second call: owner→viewer (returns null - no friendship either way)
+    mockPrisma.friendship.findUnique.mockResolvedValueOnce(null);
 
     const permission = await getFriendCalendarPermission('owner1', 'viewer1');
 
@@ -70,11 +73,10 @@ describe('Calendar Access Policy - Permissions', () => {
     const mockPrisma = prisma as any;
 
     mockIsBlocked.mockResolvedValue(false);
-    mockPrisma.friendship.findFirst.mockResolvedValue({
+    // First call: viewer→owner direction (preferred)
+    mockPrisma.friendship.findUnique.mockResolvedValueOnce({
       canViewCalendar: false,
       detailLevel: 'BUSY_ONLY',
-      requesterId: 'viewer1',
-      addresseeId: 'owner1',
     });
 
     const permission = await getFriendCalendarPermission('owner1', 'viewer1');
@@ -88,11 +90,10 @@ describe('Calendar Access Policy - Permissions', () => {
     const mockPrisma = prisma as any;
 
     mockIsBlocked.mockResolvedValue(false);
-    mockPrisma.friendship.findFirst.mockResolvedValue({
+    // First call: viewer→owner direction (preferred)
+    mockPrisma.friendship.findUnique.mockResolvedValueOnce({
       canViewCalendar: true,
       detailLevel: 'DETAILS', // Per-friend override
-      requesterId: 'viewer1',
-      addresseeId: 'owner1',
     });
 
     const permission = await getFriendCalendarPermission('owner1', 'viewer1');
@@ -106,11 +107,10 @@ describe('Calendar Access Policy - Permissions', () => {
     const mockPrisma = prisma as any;
 
     mockIsBlocked.mockResolvedValue(false);
-    mockPrisma.friendship.findFirst.mockResolvedValue({
+    // First call: viewer→owner direction (preferred)
+    mockPrisma.friendship.findUnique.mockResolvedValueOnce({
       canViewCalendar: true,
       detailLevel: null, // No override, use default
-      requesterId: 'viewer1',
-      addresseeId: 'owner1',
     });
     mockPrisma.settings.findUnique.mockResolvedValue({
       defaultDetailLevel: 'BUSY_ONLY',
@@ -127,11 +127,10 @@ describe('Calendar Access Policy - Permissions', () => {
     const mockPrisma = prisma as any;
 
     mockIsBlocked.mockResolvedValue(false);
-    mockPrisma.friendship.findFirst.mockResolvedValue({
+    // First call: viewer→owner direction (preferred)
+    mockPrisma.friendship.findUnique.mockResolvedValueOnce({
       canViewCalendar: true,
       detailLevel: 'BUSY_ONLY', // Override: stricter than default
-      requesterId: 'viewer1',
-      addresseeId: 'owner1',
     });
     mockPrisma.settings.findUnique.mockResolvedValue({
       defaultDetailLevel: 'DETAILS',

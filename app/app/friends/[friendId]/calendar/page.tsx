@@ -31,8 +31,8 @@ export default function FriendCalendarPage() {
     to: string;
   } | null>(null);
 
-  // Initialize date range to this week (Sunday to Saturday)
-  useEffect(() => {
+  // Helper function to calculate this week's date range
+  const getThisWeekDateRange = () => {
     const now = new Date();
     const sunday = new Date(now);
     sunday.setDate(now.getDate() - now.getDay());
@@ -42,10 +42,15 @@ export default function FriendCalendarPage() {
     saturday.setDate(sunday.getDate() + 6);
     saturday.setHours(23, 59, 59, 999);
 
-    setDateRange({
+    return {
       from: sunday.toISOString(),
       to: saturday.toISOString(),
-    });
+    };
+  };
+
+  // Initialize date range to this week (Sunday to Saturday)
+  useEffect(() => {
+    setDateRange(getThisWeekDateRange());
   }, []);
 
   // Fetch events when date range changes
@@ -58,7 +63,7 @@ export default function FriendCalendarPage() {
 
       try {
         const response = await fetch(
-          `/api/calendars/friends/${friendId}?from=${encodeURIComponent(
+          `/api/calendars/friends/${encodeURIComponent(friendId)}?from=${encodeURIComponent(
             dateRange.from
           )}&to=${encodeURIComponent(dateRange.to)}`
         );
@@ -117,19 +122,7 @@ export default function FriendCalendarPage() {
   };
 
   const handleThisWeek = () => {
-    const now = new Date();
-    const sunday = new Date(now);
-    sunday.setDate(now.getDate() - now.getDay());
-    sunday.setHours(0, 0, 0, 0);
-
-    const saturday = new Date(sunday);
-    saturday.setDate(sunday.getDate() + 6);
-    saturday.setHours(23, 59, 59, 999);
-
-    setDateRange({
-      from: sunday.toISOString(),
-      to: saturday.toISOString(),
-    });
+    setDateRange(getThisWeekDateRange());
   };
 
   const formatDate = (dateString: string) => {
