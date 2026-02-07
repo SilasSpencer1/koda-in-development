@@ -16,7 +16,11 @@ export interface Interval {
 export function mergeIntervals(intervals: Interval[]): Interval[] {
   if (intervals.length === 0) return [];
 
-  const sorted = [...intervals].sort((a, b) => a.start - b.start);
+  // Deep-clone to avoid mutating caller's objects
+  const sorted = intervals
+    .map((iv) => ({ start: iv.start, end: iv.end }))
+    .sort((a, b) => a.start - b.start);
+
   const merged: Interval[] = [sorted[0]];
 
   for (let i = 1; i < sorted.length; i++) {

@@ -28,6 +28,11 @@ export async function GET(
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }
 
+    // Must be PUBLIC event
+    if (event.visibility !== 'PUBLIC') {
+      return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+    }
+
     // Only host
     if (event.ownerId !== session.user.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });

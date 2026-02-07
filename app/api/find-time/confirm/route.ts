@@ -116,55 +116,55 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create event + host attendee
-    const event = await prisma.event.create({
-      data: {
-        ownerId: userId,
-        title: data.title,
-        description: null,
-        locationName: data.locationName || null,
-        startAt: startTime,
-        endAt: endTime,
-        timezone: data.timezone,
-        visibility: data.visibility as EventVisibility,
-        coverMode: data.coverMode as CoverMode,
-        attendees: {
-          create: {
-            userId,
-            role: 'HOST',
-            status: 'GOING',
-            anonymity: 'NAMED',
-          },
-        },
-      },
-    });
-
-    // Create invitee attendee rows and notifications
-    if (inviteeIds.length > 0) {
-      await Promise.all(
-        inviteeIds.map(async (inviteeId) => {
-          await prisma.attendee.create({
-            data: {
-              eventId: event.id,
-              userId: inviteeId,
-              role: 'ATTENDEE',
-              status: 'INVITED',
+    // Atomic: create event + host attendee + invitee rows + notifications
+    const event = await prisma.$transaction(async (tx) => {
+      const newEvent = await tx.event.create({
+        data: {
+          ownerId: userId,
+          title: data.title,
+          description: null,
+          locationName: data.locationName || null,
+          startAt: startTime,
+          endAt: endTime,
+          timezone: data.timezone,
+          visibility: data.visibility as EventVisibility,
+          coverMode: data.coverMode as CoverMode,
+          attendees: {
+            create: {
+              userId,
+              role: 'HOST',
+              status: 'GOING',
               anonymity: 'NAMED',
             },
-          });
+          },
+        },
+      });
 
-          await prisma.notification.create({
-            data: {
-              userId: inviteeId,
-              type: 'EVENT_INVITE',
-              title: 'You were invited to an event',
-              body: `${session.user?.name || 'Someone'} invited you to "${event.title}"`,
-              href: `/app/events/${event.id}`,
-            },
-          });
-        })
-      );
-    }
+      // Create invitee attendee rows and notifications
+      for (const inviteeId of inviteeIds) {
+        await tx.attendee.create({
+          data: {
+            eventId: newEvent.id,
+            userId: inviteeId,
+            role: 'ATTENDEE',
+            status: 'INVITED',
+            anonymity: 'NAMED',
+          },
+        });
+
+        await tx.notification.create({
+          data: {
+            userId: inviteeId,
+            type: 'EVENT_INVITE',
+            title: 'You were invited to an event',
+            body: `${session.user?.name || 'Someone'} invited you to "${newEvent.title}"`,
+            href: `/app/events/${newEvent.id}`,
+          },
+        });
+      }
+
+      return newEvent;
+    });
 
     return NextResponse.json({ eventId: event.id }, { status: 201 });
   } catch (error) {

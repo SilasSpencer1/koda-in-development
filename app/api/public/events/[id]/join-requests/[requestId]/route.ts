@@ -70,51 +70,56 @@ export async function PATCH(
     }
 
     if (action === 'approve') {
-      // Update join request status
-      const updated = await prisma.joinRequest.update({
-        where: { id: requestId },
-        data: { status: 'APPROVED' },
-      });
+      // Atomic: update request + create attendee + notify
+      const [updated, attendee] = await prisma.$transaction(async (tx) => {
+        const updatedReq = await tx.joinRequest.update({
+          where: { id: requestId },
+          data: { status: 'APPROVED' },
+        });
 
-      // Create attendee row
-      const attendee = await prisma.attendee.create({
-        data: {
-          eventId: id,
-          userId: joinRequest.requesterId,
-          role: 'ATTENDEE',
-          status: 'GOING',
-          anonymity: 'NAMED',
-        },
-      });
+        const newAttendee = await tx.attendee.create({
+          data: {
+            eventId: id,
+            userId: joinRequest.requesterId,
+            role: 'ATTENDEE',
+            status: 'GOING',
+            anonymity: 'NAMED',
+          },
+        });
 
-      // Notify requester
-      await prisma.notification.create({
-        data: {
-          userId: joinRequest.requesterId,
-          type: 'JOIN_REQUEST_APPROVED',
-          title: 'Join request approved',
-          body: `Your request to join "${event.title}" was approved!`,
-          href: `/app/public/events/${event.id}`,
-        },
+        await tx.notification.create({
+          data: {
+            userId: joinRequest.requesterId,
+            type: 'JOIN_REQUEST_APPROVED',
+            title: 'Join request approved',
+            body: `Your request to join "${event.title}" was approved!`,
+            href: `/app/public/events/${event.id}`,
+          },
+        });
+
+        return [updatedReq, newAttendee] as const;
       });
 
       return NextResponse.json({ joinRequest: updated, attendee });
     } else {
-      // Deny
-      const updated = await prisma.joinRequest.update({
-        where: { id: requestId },
-        data: { status: 'DENIED' },
-      });
+      // Atomic: deny request + notify
+      const updated = await prisma.$transaction(async (tx) => {
+        const updatedReq = await tx.joinRequest.update({
+          where: { id: requestId },
+          data: { status: 'DENIED' },
+        });
 
-      // Notify requester
-      await prisma.notification.create({
-        data: {
-          userId: joinRequest.requesterId,
-          type: 'JOIN_REQUEST_DENIED',
-          title: 'Join request denied',
-          body: `Your request to join "${event.title}" was not approved.`,
-          href: `/app/public/events/${event.id}`,
-        },
+        await tx.notification.create({
+          data: {
+            userId: joinRequest.requesterId,
+            type: 'JOIN_REQUEST_DENIED',
+            title: 'Join request denied',
+            body: `Your request to join "${event.title}" was not approved.`,
+            href: `/app/public/events/${event.id}`,
+          },
+        });
+
+        return updatedReq;
       });
 
       return NextResponse.json({ joinRequest: updated });

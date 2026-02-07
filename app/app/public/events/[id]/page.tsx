@@ -258,12 +258,14 @@ export default function PublicEventPage() {
                 hour: 'numeric',
                 minute: '2-digit',
                 hour12: true,
+                timeZone: event.timezone,
               })}{' '}
               &ndash;{' '}
               {new Date(event.endAt).toLocaleTimeString('en-US', {
                 hour: 'numeric',
                 minute: '2-digit',
                 hour12: true,
+                timeZone: event.timezone,
               })}
             </p>
 

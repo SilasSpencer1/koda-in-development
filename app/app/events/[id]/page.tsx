@@ -329,22 +329,28 @@ export default function EventDetailPage() {
                   value={event.visibility}
                   onChange={async (e) => {
                     const newVisibility = e.target.value;
+                    const previousVisibility = event.visibility;
+                    // Optimistic update
+                    setEvent((prev) =>
+                      prev ? { ...prev, visibility: newVisibility } : prev
+                    );
                     try {
                       const res = await fetch(`/api/events/${event.id}`, {
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ visibility: newVisibility }),
                       });
-                      if (res.ok) {
-                        const updated = await res.json();
-                        setEvent((prev) =>
-                          prev
-                            ? { ...prev, visibility: updated.visibility }
-                            : prev
-                        );
+                      if (!res.ok) {
+                        throw new Error('Failed to update visibility');
                       }
                     } catch {
-                      // Silently handle
+                      // Revert on failure
+                      setEvent((prev) =>
+                        prev
+                          ? { ...prev, visibility: previousVisibility }
+                          : prev
+                      );
+                      setError('Failed to update event visibility');
                     }
                   }}
                   className="px-3 py-2 rounded-lg border border-slate-200 text-sm"

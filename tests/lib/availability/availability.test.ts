@@ -28,6 +28,17 @@ describe('mergeIntervals', () => {
     expect(mergeIntervals(input)).toEqual(input);
   });
 
+  it('should not mutate the original input intervals', () => {
+    const input: Interval[] = [
+      { start: h(9), end: h(11) },
+      { start: h(10), end: h(12) },
+    ];
+    const originalEnd = input[0].end;
+    mergeIntervals(input);
+    // The caller's object should remain unchanged
+    expect(input[0].end).toBe(originalEnd);
+  });
+
   it('should merge overlapping intervals', () => {
     const input: Interval[] = [
       { start: h(9), end: h(11) },
