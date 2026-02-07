@@ -7,12 +7,6 @@ import { prisma } from '@/lib/db/prisma';
 import type { Event, DetailLevel } from '@prisma/client';
 import { isBlocked } from './friendship';
 
-export interface EventViewerContext {
-  event: Event;
-  ownerId: string;
-  viewerId: string;
-}
-
 /**
  * Determine if a viewer can see event details (full or redacted)
  * Returns true if viewer is allowed to see ANY details (not just busy block)
@@ -60,7 +54,6 @@ export async function canViewerSeeEvent(
     },
     select: {
       canViewCalendar: true,
-      detailLevel: true,
     },
   });
 

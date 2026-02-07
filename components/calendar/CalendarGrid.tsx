@@ -49,7 +49,11 @@ export function CalendarGrid({ events, onEventClick }: CalendarGridProps) {
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   const today = new Date();
   const weekStart = new Date(today);
-  weekStart.setDate(today.getDate() - today.getDay() + 1);
+  const dayOfWeek = today.getDay();
+  // getDay() returns 0 for Sunday; offset so Monday is always the start
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  weekStart.setDate(today.getDate() + mondayOffset);
+  weekStart.setHours(0, 0, 0, 0);
 
   return (
     <div className="relative w-full bg-gradient-to-br from-white/50 via-blue-50/30 to-white/50 backdrop-blur-xl rounded-3xl border border-white/30 shadow-xl p-8 overflow-hidden">

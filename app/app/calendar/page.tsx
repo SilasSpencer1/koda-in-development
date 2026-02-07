@@ -27,7 +27,11 @@ export default function CalendarPage() {
 
         const now = new Date();
         const weekStart = new Date(now);
-        weekStart.setDate(now.getDate() - now.getDay() + 1);
+        const day = now.getDay();
+        // getDay() returns 0 for Sunday; offset so Monday is always the start
+        const mondayOffset = day === 0 ? -6 : 1 - day;
+        weekStart.setDate(now.getDate() + mondayOffset);
+        weekStart.setHours(0, 0, 0, 0);
         const weekEnd = new Date(weekStart);
         weekEnd.setDate(weekStart.getDate() + 7);
 

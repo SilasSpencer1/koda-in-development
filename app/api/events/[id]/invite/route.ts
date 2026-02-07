@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/db/prisma';
 import { z } from 'zod';
-import { areFriends, isBlocked } from '@/lib/policies/friendship';
 
 const InviteSchema = z.object({
   userIds: z.array(z.string()).min(1),
@@ -78,23 +77,54 @@ export async function POST(
       );
     }
 
-    // Check friendship and block status for each invitee
-    const validInvitees = [];
-    for (const invitee of invitees) {
-      const blocked = await isBlocked(session.user.id, invitee.id);
-      if (blocked) {
+    // Batch-check friendship and block status for all invitees at once (avoids N+1)
+    const inviteeIds = invitees.map((u) => u.id);
+
+    const [blockedRelations, acceptedFriendships] = await Promise.all([
+      prisma.friendship.findMany({
+        where: {
+          status: 'BLOCKED',
+          OR: [
+            { requesterId: session.user.id, addresseeId: { in: inviteeIds } },
+            { requesterId: { in: inviteeIds }, addresseeId: session.user.id },
+          ],
+        },
+        select: { requesterId: true, addresseeId: true },
+      }),
+      prisma.friendship.findMany({
+        where: {
+          status: 'ACCEPTED',
+          OR: [
+            { requesterId: session.user.id, addresseeId: { in: inviteeIds } },
+            { requesterId: { in: inviteeIds }, addresseeId: session.user.id },
+          ],
+        },
+        select: { requesterId: true, addresseeId: true },
+      }),
+    ]);
+
+    const blockedUserIds = new Set(
+      blockedRelations.flatMap((r) => [r.requesterId, r.addresseeId])
+    );
+    blockedUserIds.delete(session.user.id);
+
+    const friendUserIds = new Set(
+      acceptedFriendships.map((r) =>
+        r.requesterId === session.user.id ? r.addresseeId : r.requesterId
+      )
+    );
+
+    const validInvitees = invitees.filter((invitee) => {
+      if (blockedUserIds.has(invitee.id)) {
         console.warn(`Cannot invite blocked user ${invitee.id}`);
-        continue;
+        return false;
       }
-
-      const isFriend = await areFriends(session.user.id, invitee.id);
-      if (!isFriend) {
+      if (!friendUserIds.has(invitee.id)) {
         console.warn(`Cannot invite non-friend ${invitee.id}`);
-        continue;
+        return false;
       }
-
-      validInvitees.push(invitee);
-    }
+      return true;
+    });
 
     if (validInvitees.length === 0) {
       return NextResponse.json(

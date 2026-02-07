@@ -37,8 +37,19 @@ export async function GET(request: NextRequest) {
       to: searchParams.get('to'),
     });
 
+    // Include events the user owns OR is attending/invited to (exclude DECLINED)
     const where: Record<string, unknown> = {
-      ownerId: session.user.id,
+      OR: [
+        { ownerId: session.user.id },
+        {
+          attendees: {
+            some: {
+              userId: session.user.id,
+              status: { not: 'DECLINED' },
+            },
+          },
+        },
+      ],
     };
 
     if (query.from || query.to) {
