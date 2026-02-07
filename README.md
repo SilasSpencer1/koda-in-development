@@ -332,6 +332,178 @@ To test route protection:
 3. Redirected to `/login?callbackUrl=/app`
 4. After login, redirected back to `/app`
 
+## Calendar & Events (Sprint 3)
+
+### Overview
+
+Koda's calendar system allows users to create, view, and manage events with friends. Features include:
+
+- **Event CRUD**: Create, update, and delete events with title, time, location, timezone, visibility, and cover mode
+- **Event Visibility**: PRIVATE, FRIENDS, PUBLIC
+- **Cover Mode**: BUSY_ONLY redacts details to non-owners (shows "Busy" only)
+- **Invitations**: Invite friends to events with automatic notifications
+- **RSVP**: Attendees can respond as GOING or DECLINED
+- **Anonymity**: Attendees can choose to attend anonymously; host cannot override
+- **Calendar UI**: Premium glassmorphic week view + agenda list
+- **Notifications**: In-app and email invitations (with dev-mode toggle)
+
+### Testing the Calendar Locally
+
+#### Setup
+
+Ensure your database is seeded with test users:
+
+```bash
+pnpm db:seed
+```
+
+#### 1. Create an Event
+
+```bash
+curl -X POST http://localhost:3000/api/events \
+  -H "Content-Type: application/json" \
+  -H "Cookie: authjs.session-token=<your-session-token>" \
+  -d '{
+    "title": "Coffee Meetup",
+    "startAt": "2026-02-10T14:00:00Z",
+    "endAt": "2026-02-10T15:00:00Z",
+    "timezone": "America/New_York",
+    "visibility": "FRIENDS",
+    "coverMode": "NONE",
+    "locationName": "Local Cafe"
+  }'
+```
+
+#### 2. View Your Calendar
+
+Navigate to `http://localhost:3000/app/calendar` to see your events in week view and agenda list.
+
+#### 3. Invite a Friend
+
+```bash
+curl -X POST http://localhost:3000/api/events/:id/invite \
+  -H "Content-Type: application/json" \
+  -H "Cookie: authjs.session-token=<your-session-token>" \
+  -d '{
+    "userIds": ["friend-user-id"]
+  }'
+```
+
+Note: The friend must be an accepted friend to receive the invite.
+
+#### 4. RSVP as Invitee
+
+```bash
+curl -X POST http://localhost:3000/api/events/:id/rsvp \
+  -H "Content-Type: application/json" \
+  -H "Cookie: authjs.session-token=<invitee-session-token>" \
+  -d '{ "status": "GOING" }'
+```
+
+#### 5. Toggle Anonymity
+
+```bash
+curl -X POST http://localhost:3000/api/events/:id/anonymity \
+  -H "Content-Type: application/json" \
+  -H "Cookie: authjs.session-token=<invitee-session-token>" \
+  -d '{ "anonymity": "ANONYMOUS" }'
+```
+
+#### 6. View Event Details (with Anonymity Enforcement)
+
+```bash
+curl http://localhost:3000/api/events/:id \
+  -H "Cookie: authjs.session-token=<your-session-token>"
+```
+
+Anonymous attendees will show as "Anonymous attendee" without email/userId.
+
+### Email Notifications
+
+By default, email notifications are **disabled** for local development. To enable:
+
+1. Get a **Resend API key** at [resend.com](https://resend.com)
+2. Update `.env.local`:
+
+   ```bash
+   EMAIL_ENABLED=true
+   RESEND_API_KEY=re_your_key_here
+   EMAIL_FROM=noreply@koda.app
+   ```
+
+3. Restart the dev server
+
+When enabled, invitees will receive email invitations. When disabled, a log message appears in the server console instead.
+
+### Calendar UI Features
+
+**Week View**:
+
+- Displays Mon–Sun with hourly grid (8am–10pm)
+- Event blocks positioned by start/end time
+- Click events to open detail modal
+- Premium glassmorphism styling with frosted glass effect
+
+**Agenda List**:
+
+- Shows upcoming events sorted by time
+- Quick view of date, time, and status
+- Click to open event detail page
+
+**Event Detail Page**:
+
+- Full event info: title, time, location, description
+- Attendees list (respects anonymity rules)
+- RSVP buttons for invitees
+- Anonymity toggle for attendees
+- Edit/delete buttons for event owner
+
+### Data Model
+
+**Event**:
+
+- `id, ownerId, title, description?, locationName?`
+- `startAt, endAt, timezone`
+- `visibility` (PRIVATE | FRIENDS | PUBLIC)
+- `coverMode` (NONE | BUSY_ONLY)
+- `createdAt, updatedAt`
+
+**Attendee**:
+
+- `id, eventId, userId`
+- `status` (INVITED | GOING | DECLINED)
+- `anonymity` (NAMED | ANONYMOUS)
+- `role` (HOST | ATTENDEE)
+- `createdAt, updatedAt`
+
+**Notification**:
+
+- `id, userId, type` (EVENT_INVITE)
+- `title, body, href, isRead`
+- `createdAt`
+
+### Authorization & Privacy
+
+**Event Visibility Rules**:
+
+1. **Owner** always sees full details
+2. **Non-owner** must be:
+   - An accepted friend with `canViewCalendar=true`
+   - Have appropriate `detailLevel` (BUSY_ONLY | DETAILS)
+3. **PRIVATE events**: Only owner sees details; non-owner blocked (403/404)
+4. **FRIENDS events**: Friends with permission see details per `detailLevel`
+5. **PUBLIC events**: Currently treated like FRIENDS (no public web browsing yet)
+
+**Cover Mode**:
+
+- If `coverMode=BUSY_ONLY`, non-owners always see "Busy" regardless of detail level
+
+**Anonymity**:
+
+- Attendees can set their own anonymity
+- Host **cannot override** attendee anonymity (enforced server-side)
+- Anonymous attendees show as "Anonymous attendee" in attendee list (except for self and owner)
+
 GitHub Actions workflow runs on every PR and push to `main`:
 
 - **Linting** (`pnpm lint`)
