@@ -110,7 +110,7 @@ export async function POST(
 
     const friendUserIds = new Set(
       acceptedFriendships.map((r) =>
-        r.requesterId === session.user.id ? r.addresseeId : r.requesterId
+        r.requesterId === session.user?.id ? r.addresseeId : r.requesterId
       )
     );
 
