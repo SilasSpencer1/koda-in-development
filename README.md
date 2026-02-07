@@ -579,6 +579,90 @@ In Railway, set these via the dashboard under **Variables**.
 
 No credit card required for initial deployment!
 
+## Public Events & Join Requests (Sprint 4)
+
+### Public Event Pages
+
+Public events (`visibility: PUBLIC`) are accessible via a dedicated link-shareable page:
+
+- **Route**: `/app/public/events/:id`
+- **Authorization**: Requires login (MVP). Non-authenticated users are redirected to login first.
+- **Design choice**: We require login for public event pages to enforce block checks, prevent data scraping, and simplify anonymity enforcement. No public search feed is implemented.
+
+#### How it works
+
+1. Host creates or edits an event and sets visibility to `PUBLIC`
+2. A shareable link appears on the event detail page: `/app/public/events/:id`
+3. Any logged-in user can view the event details and attendee list
+4. Anonymous attendees appear as "Anonymous attendee" (attendee-controlled)
+5. Non-attendees can click "Request to Join" which sends a pending request to the host
+6. Host sees a "Join Requests" panel on the public event page with Approve/Deny buttons
+7. On approval, the requester becomes an attendee (status: GOING) and receives a notification
+8. On denial, the requester is notified and cannot re-request
+
+#### Block rules
+
+- If the host blocked the viewer (or vice versa), the public event page returns 404
+- Blocked users cannot create join requests
+
+#### API Endpoints
+
+| Method | Path                                              | Description                                  |
+| ------ | ------------------------------------------------- | -------------------------------------------- |
+| GET    | `/api/public/events/:id`                          | Public event data + attendees + viewer state |
+| POST   | `/api/public/events/:id/join-request`             | Create join request (rate limited: 10/hr)    |
+| DELETE | `/api/public/events/:id/join-request`             | Cancel pending join request                  |
+| GET    | `/api/public/events/:id/join-requests`            | Host: list all join requests                 |
+| PATCH  | `/api/public/events/:id/join-requests/:requestId` | Host: approve or deny                        |
+
+### Find Time (Availability)
+
+Find a meeting time that works for multiple participants, then create an event with invites in one flow.
+
+#### Usage Steps
+
+1. Go to `/app/calendar` and click the **"Find Time"** button
+2. Select friends from your accepted friends list
+3. Choose a search range (next 3/7/14 days) and duration (30/60/90/120 min)
+4. Click "Find Slots" — the system computes mutually free times
+5. Pick a slot from the suggestions (up to 5, preferring earlier times)
+6. Enter a title, optional location, and visibility setting
+7. Click "Create Event & Send Invites" — creates the event and sends invites to selected friends
+
+#### Permissions
+
+- You can only find time with participants whose calendars you are allowed to view (`canViewCalendar=true` in the friendship)
+- If any participant's calendar is not viewable, the API returns a 403 with `notViewableParticipantIds`
+
+#### Algorithm
+
+- Queries all events (including BUSY_ONLY redacted) as busy blocks for each participant
+- Merges overlapping busy intervals per participant
+- Computes intersection of free time across all participants
+- Returns candidate slots aligned to 15-minute increments
+
+#### API Endpoints
+
+| Method | Path                     | Description                                |
+| ------ | ------------------------ | ------------------------------------------ |
+| POST   | `/api/find-time`         | Find available slots (rate limited: 20/hr) |
+| POST   | `/api/find-time/confirm` | Convert slot to event + send invites       |
+
+### Data Model Additions (Sprint 4)
+
+**JoinRequest**:
+
+- `id, eventId, requesterId, status` (PENDING | APPROVED | DENIED | CANCELED)
+- `message?` (optional, not used in UI)
+- `createdAt, updatedAt`
+- Unique constraint: `(eventId, requesterId)`
+
+**NotificationType** expanded:
+
+- `JOIN_REQUEST` — sent to host when someone requests to join
+- `JOIN_REQUEST_APPROVED` — sent to requester on approval
+- `JOIN_REQUEST_DENIED` — sent to requester on denial
+
 ## Next Steps
 
 After Epic 0.1, the following features are planned:

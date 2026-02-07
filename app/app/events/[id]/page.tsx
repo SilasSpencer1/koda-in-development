@@ -297,9 +297,64 @@ export default function EventDetailPage() {
             </div>
           </div>
 
+          {/* Public event link */}
+          {event.visibility === 'PUBLIC' && (
+            <div className="mt-6 p-4 rounded-xl bg-green-50/50 border border-green-100">
+              <p className="text-sm text-slate-600 mb-2">
+                This is a{' '}
+                <span className="font-semibold text-green-700">
+                  public event
+                </span>
+                . Share the link:
+              </p>
+              <Link
+                href={`/app/public/events/${event.id}`}
+                className="text-blue-600 hover:text-blue-700 font-semibold text-sm break-all"
+              >
+                {typeof window !== 'undefined' ? window.location.origin : ''}
+                /app/public/events/{event.id}
+              </Link>
+            </div>
+          )}
+
           {/* Owner actions */}
           {isOwner && (
             <div className="mt-8 pt-8 border-t border-slate-200">
+              {/* Visibility toggle */}
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Event Visibility
+                </label>
+                <select
+                  value={event.visibility}
+                  onChange={async (e) => {
+                    const newVisibility = e.target.value;
+                    try {
+                      const res = await fetch(`/api/events/${event.id}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ visibility: newVisibility }),
+                      });
+                      if (res.ok) {
+                        const updated = await res.json();
+                        setEvent((prev) =>
+                          prev
+                            ? { ...prev, visibility: updated.visibility }
+                            : prev
+                        );
+                      }
+                    } catch {
+                      // Silently handle
+                    }
+                  }}
+                  className="px-3 py-2 rounded-lg border border-slate-200 text-sm"
+                >
+                  <option value="PRIVATE">Private</option>
+                  <option value="FRIENDS">Friends</option>
+                  <option value="PUBLIC">Public</option>
+                </select>
+              </div>
+
               <div className="flex gap-3">
                 <Link
                   href={`/app/events/${event.id}/edit`}
