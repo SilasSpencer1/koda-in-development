@@ -65,7 +65,7 @@ export async function POST(
               .join(' — ') || null,
           startAt: suggestion.slotStartAt,
           endAt: suggestion.slotEndAt,
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          timezone: 'UTC',
           visibility: 'FRIENDS',
           coverMode: 'NONE',
           attendees: {

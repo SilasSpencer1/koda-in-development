@@ -121,6 +121,21 @@ export async function GET(request: NextRequest) {
 }
 
 /**
+ * Generate a stable fallback externalId when one is not provided.
+ * Uses a hash of source + title + venueName + slotStartAt to avoid collisions.
+ */
+function stableExternalId(s: SuggestionDTO): string {
+  if (s.externalId) return s.externalId;
+  const raw = `${s.source}:${s.title}:${s.venueName ?? ''}:${s.slotStartAt}`;
+  // Simple hash — not crypto, just stable dedup key
+  let hash = 0;
+  for (let i = 0; i < raw.length; i++) {
+    hash = ((hash << 5) - hash + raw.charCodeAt(i)) | 0;
+  }
+  return `gen-${Math.abs(hash).toString(36)}`;
+}
+
+/**
  * Persist suggestion DTOs to the database via upsert.
  * Returns the persisted rows.
  */
@@ -131,12 +146,13 @@ async function persistSuggestions(
   const results = [];
 
   for (const s of suggestions) {
+    const extId = stableExternalId(s);
     try {
       const row = await prisma.suggestion.upsert({
         where: {
           userId_externalId_slotStartAt: {
             userId,
-            externalId: s.externalId ?? '',
+            externalId: extId,
             slotStartAt: new Date(s.slotStartAt),
           },
         },
@@ -173,7 +189,7 @@ async function persistSuggestions(
           isOpenAtTime: s.isOpenAtTime as 'OPEN' | 'CLOSED' | 'UNKNOWN',
           confidence: s.confidence as 'HIGH' | 'LOW',
           status: 'PROPOSED',
-          externalId: s.externalId ?? '',
+          externalId: extId,
           rawPayload: (s.rawPayload as object) ?? undefined,
         },
       });

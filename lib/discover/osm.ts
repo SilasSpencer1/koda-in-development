@@ -60,7 +60,11 @@ async function geocodeCity(
   const cached = await cacheGet<{ lat: number; lng: number }>(cacheKey);
   if (cached) return cached;
 
-  const userAgent = process.env.OSM_USER_AGENT || 'Koda/1.0';
+  const userAgent = process.env.OSM_USER_AGENT;
+  if (!userAgent) {
+    console.warn('[Nominatim] OSM_USER_AGENT not set, skipping geocoding');
+    return null;
+  }
 
   try {
     const params = new URLSearchParams({
@@ -110,10 +114,13 @@ async function fetchOverpass(
   radiusMeters: number,
   tags: string[]
 ): Promise<OverpassElement[]> {
-  // Build union of node/way queries for each tag
-  const queries = tags.map((tag) => {
+  // Build union of node + way queries for each tag (venues can be either)
+  const queries = tags.flatMap((tag) => {
     const [key, value] = tag.split('=');
-    return `node["${key}"="${value}"](around:${radiusMeters},${lat},${lng});`;
+    return [
+      `node["${key}"="${value}"](around:${radiusMeters},${lat},${lng});`,
+      `way["${key}"="${value}"](around:${radiusMeters},${lat},${lng});`,
+    ];
   });
 
   const query = `[out:json][timeout:15];(${queries.join('')});out center 30;`;

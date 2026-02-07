@@ -144,8 +144,22 @@ function parseTimeRanges(text: string): TimeRange[] | null {
       .match(/^(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})$/);
     if (!match) return null;
 
-    const openMin = parseInt(match[1]) * 60 + parseInt(match[2]);
-    const closeMin = parseInt(match[3]) * 60 + parseInt(match[4]);
+    const openHour = parseInt(match[1]);
+    const openMinute = parseInt(match[2]);
+    const closeHour = parseInt(match[3]);
+    const closeMinute = parseInt(match[4]);
+
+    // Validate time bounds (0-23:59 for open, 0-24:00 for close)
+    if (openHour > 23 || openMinute > 59) return null;
+    if (
+      closeHour > 24 ||
+      (closeHour === 24 && closeMinute > 0) ||
+      closeMinute > 59
+    )
+      return null;
+
+    const openMin = openHour * 60 + openMinute;
+    const closeMin = closeHour * 60 + closeMinute;
     if (openMin >= closeMin) return null; // skip overnight for now
 
     ranges.push({ openMin, closeMin });
@@ -194,7 +208,7 @@ function isTimeInRules(rules: DayRule[], dt: Date): boolean {
     if (!rule.days.includes(dayOfWeek)) continue;
 
     for (const range of rule.ranges) {
-      if (minuteOfDay >= range.openMin && minuteOfDay < range.closeMin) {
+      if (minuteOfDay >= range.openMin && minuteOfDay <= range.closeMin) {
         return true;
       }
     }

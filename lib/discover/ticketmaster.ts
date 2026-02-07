@@ -50,9 +50,10 @@ export async function fetchTicketmasterEvents(
     return [];
   }
 
-  const dateStr = query.slotStart.toISOString().split('T')[0];
-  const interestsHash = query.interests.sort().join(',');
-  const cacheKey = `tm:${query.city}:${dateStr}:${query.radiusMiles}:${interestsHash}`;
+  const slotStartIso = query.slotStart.toISOString();
+  const slotEndIso = query.slotEnd.toISOString();
+  const interestsHash = [...query.interests].sort().join(',');
+  const cacheKey = `tm:${query.city}:${slotStartIso}:${slotEndIso}:${query.radiusMiles}:${interestsHash}`;
 
   // Check cache
   const cached = await cacheGet<TmEvent[]>(cacheKey);
@@ -119,10 +120,14 @@ function normalizeTmEvent(ev: TmEvent, query: DiscoverQuery): SuggestionDTO {
           .join(', ')
       : undefined,
     lat: venue?.location?.latitude
-      ? parseFloat(venue.location.latitude)
+      ? Number.isFinite(parseFloat(venue.location.latitude))
+        ? parseFloat(venue.location.latitude)
+        : undefined
       : undefined,
     lng: venue?.location?.longitude
-      ? parseFloat(venue.location.longitude)
+      ? Number.isFinite(parseFloat(venue.location.longitude))
+        ? parseFloat(venue.location.longitude)
+        : undefined
       : undefined,
     url: ev.url || undefined,
     imageUrl: image?.url || undefined,

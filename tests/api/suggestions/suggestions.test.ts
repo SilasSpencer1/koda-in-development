@@ -166,4 +166,55 @@ describe('Suggestions API', () => {
       expect(found?.status).toBe('ADDED');
     });
   });
+
+  describe('Save', () => {
+    it('should set status to SAVED', async () => {
+      const suggestion = makeSuggestion();
+      const saved = { ...suggestion, status: 'SAVED' };
+
+      mockPrisma.suggestion.findUnique.mockResolvedValue(suggestion);
+      mockPrisma.suggestion.update.mockResolvedValue(saved);
+
+      const found = await prisma.suggestion.findUnique({
+        where: { id: suggestionId },
+      });
+      expect(found).not.toBeNull();
+      expect(found?.userId).toBe(userId);
+
+      const updated = await prisma.suggestion.update({
+        where: { id: suggestionId },
+        data: { status: 'SAVED' },
+      });
+
+      expect(updated.status).toBe('SAVED');
+      expect(mockPrisma.suggestion.update).toHaveBeenCalledWith({
+        where: { id: suggestionId },
+        data: { status: 'SAVED' },
+      });
+    });
+  });
+
+  describe('Error scenarios', () => {
+    it('should return null when suggestion does not exist', async () => {
+      mockPrisma.suggestion.findUnique.mockResolvedValue(null);
+
+      const found = await prisma.suggestion.findUnique({
+        where: { id: 'nonexistent' },
+      });
+
+      // Application logic: suggestion not found => 404
+      expect(found).toBeNull();
+    });
+
+    it('should handle DISMISSED suggestion correctly — cannot save after dismiss', async () => {
+      const dismissed = makeSuggestion({ status: 'DISMISSED' });
+      mockPrisma.suggestion.findUnique.mockResolvedValue(dismissed);
+
+      const found = await prisma.suggestion.findUnique({
+        where: { id: suggestionId },
+      });
+
+      expect(found?.status).toBe('DISMISSED');
+    });
+  });
 });

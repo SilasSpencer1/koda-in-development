@@ -45,6 +45,22 @@ describe('parseOpeningHours', () => {
     expect(parseOpeningHours('some random text')).toBeNull();
     expect(parseOpeningHours('PH off')).toBeNull();
   });
+
+  it('should return null for invalid time values (25:00)', () => {
+    expect(parseOpeningHours('Mo-Fr 25:00-26:00')).toBeNull();
+  });
+
+  it('should return null for invalid close time (24:01)', () => {
+    expect(parseOpeningHours('Mo-Fr 08:00-24:01')).toBeNull();
+  });
+
+  it('should return null for invalid minutes (08:60)', () => {
+    expect(parseOpeningHours('Mo-Fr 08:60-18:00')).toBeNull();
+  });
+
+  it('should return null for semicolons only', () => {
+    expect(parseOpeningHours('; ;')).toBeNull();
+  });
 });
 
 describe('isOpenAtTime', () => {
@@ -119,5 +135,12 @@ describe('isOpenAtTime', () => {
     const slotStart = makeDate(6, 15); // Saturday 3pm
     const slotEnd = makeDate(6, 18); // Saturday 6pm
     expect(isOpenAtTime(hours, slotStart, slotEnd)).toBe('CLOSED');
+  });
+
+  it('should treat slot ending exactly at closing time as OPEN', () => {
+    const hours = 'Mo-Fr 08:00-18:00';
+    const slotStart = makeDate(1, 16); // Monday 4pm
+    const slotEnd = makeDate(1, 18, 0); // Monday 6pm = closing time
+    expect(isOpenAtTime(hours, slotStart, slotEnd)).toBe('OPEN');
   });
 });

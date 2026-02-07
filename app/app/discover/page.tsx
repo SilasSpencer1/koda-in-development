@@ -337,7 +337,7 @@ export default function DiscoverPage() {
                 type="text"
                 value={prefs.city}
                 onChange={(e) => setPrefs({ ...prefs, city: e.target.value })}
-                onBlur={() => savePrefs({ city: prefs.city })}
+                onBlur={(e) => savePrefs({ city: e.target.value })}
                 placeholder="e.g. New York"
                 className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm"
               />
@@ -354,8 +354,16 @@ export default function DiscoverPage() {
                 onChange={(e) =>
                   setPrefs({ ...prefs, radiusMiles: Number(e.target.value) })
                 }
-                onMouseUp={() => savePrefs({ radiusMiles: prefs.radiusMiles })}
-                onTouchEnd={() => savePrefs({ radiusMiles: prefs.radiusMiles })}
+                onMouseUp={(e) =>
+                  savePrefs({
+                    radiusMiles: Number((e.target as HTMLInputElement).value),
+                  })
+                }
+                onTouchEnd={(e) =>
+                  savePrefs({
+                    radiusMiles: Number((e.target as HTMLInputElement).value),
+                  })
+                }
                 className="w-full"
               />
             </div>
@@ -400,9 +408,9 @@ export default function DiscoverPage() {
               </p>
             ) : (
               <div className="space-y-2 max-h-[70vh] overflow-y-auto pr-1">
-                {slots.map((slot, i) => (
+                {slots.map((slot) => (
                   <button
-                    key={i}
+                    key={slot.start}
                     onClick={() => handleSlotClick(slot)}
                     className={`w-full text-left p-3 rounded-xl text-sm transition-all ${
                       selectedSlot?.start === slot.start

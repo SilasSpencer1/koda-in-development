@@ -65,6 +65,19 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json();
     const data = UpdatePreferencesSchema.parse(body);
 
+    // Seed city from user profile when creating new preferences (consistent with GET)
+    let defaultCity = '';
+    const existing = await prisma.discoveryPreferences.findUnique({
+      where: { userId: session.user.id },
+    });
+    if (!existing && data.city === undefined) {
+      const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { city: true },
+      });
+      defaultCity = user?.city ?? '';
+    }
+
     const prefs = await prisma.discoveryPreferences.upsert({
       where: { userId: session.user.id },
       update: {
@@ -76,7 +89,7 @@ export async function PATCH(request: NextRequest) {
       },
       create: {
         userId: session.user.id,
-        city: data.city ?? '',
+        city: data.city ?? defaultCity,
         radiusMiles: data.radiusMiles ?? 10,
         interests: data.interests ?? [],
       },
