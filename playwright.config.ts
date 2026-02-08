@@ -3,7 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 /**
  * Playwright E2E test configuration for Koda.
  *
- * Runs against a local dev server on port 3000.
+ * Runs against a local dev server on port 3001.
  * Uses email/password credentials (not Google OAuth) for test auth.
  */
 export default defineConfig({
@@ -28,14 +28,12 @@ export default defineConfig({
     },
   ],
 
-  webServer: process.env.CI
-    ? undefined
-    : {
-        command: 'pnpm dev --port 3001',
-        url: 'http://localhost:3001',
-        reuseExistingServer: !process.env.CI,
-        timeout: 120_000,
-        stdout: 'pipe',
-        stderr: 'pipe',
-      },
+  webServer: {
+    command: 'pnpm dev --port 3001',
+    url: 'http://localhost:3001',
+    reuseExistingServer: !process.env.CI,
+    timeout: 120_000,
+    stdout: 'pipe',
+    stderr: 'pipe',
+  },
 });
