@@ -36,11 +36,8 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
-        // Accept "identifier" (new) or "email" (legacy) field
-        const identifier =
-          (credentials?.identifier as string) ||
-          (credentials?.email as string) ||
-          '';
+        // Accept "identifier" (new) field
+        const identifier = (credentials?.identifier as string) || '';
         const password = credentials?.password as string;
 
         if (!identifier || !password) {

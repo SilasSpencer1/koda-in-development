@@ -10,7 +10,9 @@ export default async function AppLayout({
   const user = await getCurrentUser();
 
   if (!user) {
-    redirect('/login');
+    // Include callbackUrl so the login page redirects back after auth.
+    // This layout only serves /app/* routes, so /app is the correct default.
+    redirect('/login?callbackUrl=%2Fapp');
   }
 
   return (

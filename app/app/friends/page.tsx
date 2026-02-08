@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 
 // ---------------------------------------------------------------------------
@@ -50,19 +50,24 @@ export default function FriendsPage() {
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
 
   // Calendar preview
   const [viewingCalendar, setViewingCalendar] = useState<string | null>(null);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [calendarPermission, setCalendarPermission] = useState<{
     allowed: boolean;
-    detailLevel: string;
+    detailLevel: string | null;
   } | null>(null);
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [calendarFriendName, setCalendarFriendName] = useState('');
 
   // Feedback
   const [actionMessage, setActionMessage] = useState('');
+
+  // Refs for dialog a11y
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
 
   // -------------------------------------------------------------------------
   // Fetch friends
@@ -77,6 +82,8 @@ export default function FriendsPage() {
       setAccepted(data.accepted ?? []);
       setIncoming(data.incomingPending ?? []);
       setOutgoing(data.outgoingPending ?? []);
+    } catch {
+      // Network error — keep existing state, surface nothing disruptive
     } finally {
       setFriendsLoading(false);
     }
@@ -100,8 +107,11 @@ export default function FriendsPage() {
       if (!res.ok) return;
       const data = await res.json();
       setSearchResults(data.results ?? []);
+    } catch {
+      setActionMessage('Search failed. Please try again.');
     } finally {
       setSearching(false);
+      setHasSearched(true);
     }
   };
 
@@ -111,19 +121,23 @@ export default function FriendsPage() {
 
   const sendRequest = async (targetUserId: string) => {
     setActionMessage('');
-    const res = await fetch('/api/friends/request', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ targetUserId }),
-    });
-    if (res.ok) {
-      setActionMessage('Friend request sent');
-      await fetchFriends();
-      // Refresh search results to update relationship status (preserve the success message)
-      if (query.trim()) await handleSearch(true);
-    } else {
-      const data = await res.json().catch(() => ({}));
-      setActionMessage(data.error || 'Failed to send request');
+    try {
+      const res = await fetch('/api/friends/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetUserId }),
+      });
+      if (res.ok) {
+        setActionMessage('Friend request sent');
+        await fetchFriends();
+        // Refresh search results to update relationship status (preserve the success message)
+        if (query.trim()) await handleSearch(true);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setActionMessage(data.error || 'Failed to send request');
+      }
+    } catch {
+      setActionMessage('Network error. Please try again.');
     }
   };
 
@@ -136,21 +150,25 @@ export default function FriendsPage() {
     action: 'accept' | 'decline'
   ) => {
     setActionMessage('');
-    const res = await fetch(`/api/friends/request/${friendshipId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action }),
-    });
-    if (res.ok) {
-      setActionMessage(
-        action === 'accept'
-          ? 'Friend request accepted'
-          : 'Friend request declined'
-      );
-      await fetchFriends();
-    } else {
-      const data = await res.json().catch(() => ({}));
-      setActionMessage(data.error || 'Failed to respond');
+    try {
+      const res = await fetch(`/api/friends/request/${friendshipId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      if (res.ok) {
+        setActionMessage(
+          action === 'accept'
+            ? 'Friend request accepted'
+            : 'Friend request declined'
+        );
+        await fetchFriends();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setActionMessage(data.error || 'Failed to respond');
+      }
+    } catch {
+      setActionMessage('Network error. Please try again.');
     }
   };
 
@@ -160,12 +178,19 @@ export default function FriendsPage() {
 
   const removeFriend = async (friendshipId: string) => {
     setActionMessage('');
-    const res = await fetch(`/api/friends/${friendshipId}`, {
-      method: 'DELETE',
-    });
-    if (res.ok) {
-      setActionMessage('Friend removed');
-      await fetchFriends();
+    try {
+      const res = await fetch(`/api/friends/${friendshipId}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        setActionMessage('Friend removed');
+        await fetchFriends();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setActionMessage(data.error || 'Failed to remove friend');
+      }
+    } catch {
+      setActionMessage('Network error. Please try again.');
     }
   };
 
@@ -181,20 +206,27 @@ export default function FriendsPage() {
     setCalendarPermission(null);
 
     // Fetch events for the next 30 days
-    const from = new Date().toISOString();
-    const to = new Date(Date.now() + 30 * 86_400_000).toISOString();
+    const from = new Date();
+    const to = new Date(Date.now() + 30 * 86_400_000);
+    const params = new URLSearchParams({
+      from: from.toISOString(),
+      to: to.toISOString(),
+    });
 
     try {
       const res = await fetch(
-        `/api/calendars/friends/${friendUserId}?from=${from}&to=${to}`
+        `/api/calendars/friends/${friendUserId}?${params.toString()}`
       );
       if (res.ok) {
         const data = await res.json();
         setCalendarEvents(data.events ?? []);
         setCalendarPermission(data.permission ?? null);
       } else if (res.status === 403) {
-        setCalendarPermission({ allowed: false, detailLevel: 'NONE' });
+        setCalendarPermission({ allowed: false, detailLevel: null });
       }
+    } catch {
+      setActionMessage('Failed to load calendar. Please try again.');
+      setViewingCalendar(null);
     } finally {
       setCalendarLoading(false);
     }
@@ -205,6 +237,46 @@ export default function FriendsPage() {
     setCalendarEvents([]);
     setCalendarPermission(null);
   };
+
+  // -------------------------------------------------------------------------
+  // Dialog keyboard handling
+  // -------------------------------------------------------------------------
+
+  useEffect(() => {
+    if (!viewingCalendar) return;
+
+    // Focus the close button when the dialog opens
+    closeBtnRef.current?.focus();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeCalendar();
+        return;
+      }
+
+      // Trap focus within the dialog
+      if (e.key === 'Tab' && dialogRef.current) {
+        const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length === 0) return;
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [viewingCalendar]);
 
   // -------------------------------------------------------------------------
   // Render helpers
@@ -226,6 +298,8 @@ export default function FriendsPage() {
       {user.name?.charAt(0)?.toUpperCase() || '?'}
     </div>
   );
+
+  const dialogLabelId = 'calendar-dialog-title';
 
   // -------------------------------------------------------------------------
   // Render
@@ -254,13 +328,21 @@ export default function FriendsPage() {
             id="friend-search"
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              // Reset search state when input changes so stale "No users found"
+              // doesn't show before a new search is performed
+              if (hasSearched) {
+                setHasSearched(false);
+                setSearchResults([]);
+              }
+            }}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
             placeholder="Search by name, username, or email"
             className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
           <Button
-            onClick={handleSearch}
+            onClick={() => handleSearch()}
             disabled={searching || !query.trim()}
             className="bg-blue-600 hover:bg-blue-700"
           >
@@ -309,7 +391,7 @@ export default function FriendsPage() {
           </ul>
         )}
 
-        {searchResults.length === 0 && query.trim() && !searching && (
+        {searchResults.length === 0 && hasSearched && !searching && (
           <p className="mt-3 text-sm text-gray-500">No users found.</p>
         )}
       </section>
@@ -460,16 +542,36 @@ export default function FriendsPage() {
       </section>
 
       {/* ----------------------------------------------------------------- */}
-      {/* Calendar overlay */}
+      {/* Calendar dialog */}
       {/* ----------------------------------------------------------------- */}
       {viewingCalendar && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onClick={(e) => {
+            // Close when clicking the backdrop
+            if (e.target === e.currentTarget) closeCalendar();
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={dialogLabelId}
+        >
+          <div
+            ref={dialogRef}
+            className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl"
+          >
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">
+              <h3
+                id={dialogLabelId}
+                className="text-lg font-semibold text-gray-900"
+              >
                 {calendarFriendName}&apos;s Calendar
               </h3>
-              <Button size="sm" variant="outline" onClick={closeCalendar}>
+              <Button
+                ref={closeBtnRef}
+                size="sm"
+                variant="outline"
+                onClick={closeCalendar}
+              >
                 Close
               </Button>
             </div>
