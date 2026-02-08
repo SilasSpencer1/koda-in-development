@@ -53,10 +53,10 @@ export async function login(
   await page.waitForLoadState('networkidle');
 
   // Fill login form using element IDs from app/login/page.tsx
-  await page.locator('#email').fill(email);
+  await page.locator('#identifier').fill(email);
   await page.locator('#password').fill(password);
 
-  await page.getByRole('button', { name: /sign in with email/i }).click();
+  await page.getByRole('button', { name: /sign in$/i }).click();
 
   // Wait for redirect to /app
   await page.waitForURL(/\/app/, { timeout: 15_000 });

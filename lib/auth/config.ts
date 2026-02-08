@@ -32,20 +32,33 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
     }),
     Credentials({
       credentials: {
-        email: { label: 'Email', type: 'email' },
+        identifier: { label: 'Email or Username', type: 'text' },
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error('Email and password are required');
+        // Accept "identifier" (new) or "email" (legacy) field
+        const identifier =
+          (credentials?.identifier as string) ||
+          (credentials?.email as string) ||
+          '';
+        const password = credentials?.password as string;
+
+        if (!identifier || !password) {
+          throw new Error('Email/username and password are required');
         }
 
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email as string },
-        });
+        // Look up by email or username
+        const isEmail = identifier.includes('@');
+        const user = isEmail
+          ? await prisma.user.findUnique({
+              where: { email: identifier },
+            })
+          : await prisma.user.findUnique({
+              where: { username: identifier },
+            });
 
         if (!user || !user.passwordHash) {
-          throw new Error('Invalid email or password');
+          throw new Error('Invalid credentials');
         }
 
         const isPasswordValid = await verifyPassword(
@@ -54,7 +67,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
         );
 
         if (!isPasswordValid) {
-          throw new Error('Invalid email or password');
+          throw new Error('Invalid credentials');
         }
 
         return {
