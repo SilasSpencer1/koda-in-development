@@ -26,17 +26,19 @@ export async function POST() {
 
     const userId = session.user.id;
 
-    // Delete Google Account for this user
+    // Always clean up sync tables unconditionally for this user,
+    // even if the Account row was already removed or never existed.
+    await prisma.googleEventMapping.deleteMany({ where: { userId } });
+    await prisma.googleCalendarConnection
+      .delete({ where: { userId } })
+      .catch(() => {}); // Ignore if doesn't exist
+
+    // Delete Google Account row if present
     const account = await prisma.account.findFirst({
       where: { userId, provider: 'google' },
     });
 
     if (account) {
-      // Delete in order: mappings → connection → account
-      await prisma.googleEventMapping.deleteMany({ where: { userId } });
-      await prisma.googleCalendarConnection
-        .delete({ where: { userId } })
-        .catch(() => {}); // Ignore if doesn't exist
       await prisma.account.delete({ where: { id: account.id } });
     }
 

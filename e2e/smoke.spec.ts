@@ -1,5 +1,5 @@
 /**
- * Playwright E2E Smoke Tests — Koda
+ * Playwright E2E Smoke Tests -- Koda
  *
  * Covers the main flows:
  * 1. Signup/login
@@ -7,6 +7,9 @@
  * 3. Create event + invite friend
  * 4. Friend accepts invite (RSVP GOING)
  * 5. Calendar shows the event for both accounts
+ *
+ * Tests that depend on UI not yet implemented are marked test.fixme()
+ * so they surface as "fixme" instead of silently passing.
  */
 
 import { test, expect } from '@playwright/test';
@@ -49,143 +52,152 @@ test.describe.serial('Koda Smoke Tests', () => {
 
   // -----------------------------------------------------------------------
   // 2. Add friend + accept request
+  //
+  // Friends UI is not yet implemented (page shows "coming soon").
+  // These tests are marked fixme so they surface instead of silently passing.
   // -----------------------------------------------------------------------
 
-  test('4. User A sends friend request to User B', async ({ page }) => {
+  test.fixme('4. User A sends friend request to User B', async ({ page }) => {
     await login(page, userA.email, userA.password);
     await page.goto('/app/friends');
     await page.waitForLoadState('networkidle');
 
-    // Look for "Add Friend" or search functionality
+    // The add-friend input must be visible for this flow to work
     const addFriendInput = page.getByPlaceholder(/search|email|username/i);
-    if (await addFriendInput.isVisible()) {
-      await addFriendInput.fill(userB.email);
-      // Submit friend request
-      const addBtn = page.getByRole('button', { name: /add|send|request/i });
-      if (await addBtn.isVisible()) {
-        await addBtn.click();
-        // Wait for success indication
-        await page.waitForTimeout(1000);
-      }
-    }
+    await expect(addFriendInput).toBeVisible();
+    await addFriendInput.fill(userB.email);
+
+    const addBtn = page.getByRole('button', { name: /add|send|request/i });
+    await expect(addBtn).toBeVisible();
+    await addBtn.click();
+
+    // Assert success indication (toast, text change, etc.)
+    await expect(
+      page.getByText(/sent|requested|pending/i).first()
+    ).toBeVisible();
   });
 
-  test('5. User B accepts friend request from User A', async ({ page }) => {
+  test.fixme('5. User B accepts friend request from User A', async ({
+    page,
+  }) => {
     await login(page, userB.email, userB.password);
     await page.goto('/app/friends');
     await page.waitForLoadState('networkidle');
 
-    // Look for pending request and accept
+    // Pending request accept button must be visible
     const acceptBtn = page.getByRole('button', { name: /accept/i }).first();
-    if (await acceptBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await acceptBtn.click();
-      await page.waitForTimeout(1000);
-    }
+    await expect(acceptBtn).toBeVisible();
+    await acceptBtn.click();
+
+    // Assert friendship was established
+    await expect(
+      page.getByText(/friend|accepted|connected/i).first()
+    ).toBeVisible();
   });
 
   // -----------------------------------------------------------------------
   // 3. Create event + invite friend
+  //
+  // Event creation page (/app/events/new) does not exist yet and no invite
+  // UI is present on the event detail page.
   // -----------------------------------------------------------------------
 
-  test('6. User A creates an event', async ({ page }) => {
+  test.fixme('6. User A creates an event', async ({ page }) => {
     await login(page, userA.email, userA.password);
-    await page.goto('/app/events');
+    await page.goto('/app/events/new');
     await page.waitForLoadState('networkidle');
 
-    // Try to find create event button/link
-    const createBtn = page
-      .getByRole('link', { name: /create|new event/i })
-      .or(page.getByRole('button', { name: /create|new event/i }));
+    // Event title input must be present
+    const titleInput = page.getByLabel(/title/i);
+    await expect(titleInput).toBeVisible();
+    await titleInput.fill('E2E Test Event');
 
-    if (
-      await createBtn
-        .first()
-        .isVisible({ timeout: 5000 })
-        .catch(() => false)
-    ) {
-      await createBtn.first().click();
-      await page.waitForLoadState('networkidle');
+    // Submit the form
+    const submitBtn = page.getByRole('button', {
+      name: /create|save|submit/i,
+    });
+    await expect(submitBtn).toBeVisible();
+    await submitBtn.click();
 
-      // Fill event form
-      const titleInput = page.getByLabel(/title/i);
-      if (await titleInput.isVisible()) {
-        await titleInput.fill('E2E Test Event');
-      }
-
-      // Submit
-      const submitBtn = page.getByRole('button', {
-        name: /create|save|submit/i,
-      });
-      if (await submitBtn.isVisible()) {
-        await submitBtn.click();
-        await page.waitForTimeout(2000);
-      }
-    }
+    // Should redirect to event detail or events list
+    await expect(page).toHaveURL(/\/app\/events/);
+    // Event title should appear on the resulting page
+    await expect(page.getByText('E2E Test Event')).toBeVisible();
   });
 
-  test('7. User A invites User B to the event', async ({ page }) => {
+  test.fixme('7. User A invites User B to the event', async ({ page }) => {
     await login(page, userA.email, userA.password);
     await page.goto('/app/events');
     await page.waitForLoadState('networkidle');
 
     // Navigate to the created event
     const eventLink = page.getByText('E2E Test Event').first();
-    if (await eventLink.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await eventLink.click();
-      await page.waitForLoadState('networkidle');
+    await expect(eventLink).toBeVisible();
+    await eventLink.click();
+    await page.waitForLoadState('networkidle');
 
-      // Look for invite functionality
-      const inviteBtn = page.getByRole('button', { name: /invite/i });
-      if (await inviteBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await inviteBtn.click();
-        await page.waitForTimeout(1000);
-      }
-    }
+    // Invite button must be visible on the event detail page
+    const inviteBtn = page.getByRole('button', { name: /invite/i });
+    await expect(inviteBtn).toBeVisible();
+    await inviteBtn.click();
+
+    // Assert invite was sent (toast, attendee list update, etc.)
+    await expect(page.getByText(/invited|sent/i).first()).toBeVisible();
   });
 
   // -----------------------------------------------------------------------
   // 4. Friend accepts invite (RSVP)
+  //
+  // Depends on event creation + invite (tests 6-7) which are fixme.
   // -----------------------------------------------------------------------
 
-  test('8. User B RSVPs GOING to the event', async ({ page }) => {
+  test.fixme('8. User B RSVPs GOING to the event', async ({ page }) => {
     await login(page, userB.email, userB.password);
     await page.goto('/app/events');
     await page.waitForLoadState('networkidle');
 
     // Find the invited event
     const eventLink = page.getByText('E2E Test Event').first();
-    if (await eventLink.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await eventLink.click();
-      await page.waitForLoadState('networkidle');
+    await expect(eventLink).toBeVisible();
+    await eventLink.click();
+    await page.waitForLoadState('networkidle');
 
-      // RSVP going
-      const goingBtn = page.getByRole('button', { name: /going|accept|rsvp/i });
-      if (await goingBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await goingBtn.click();
-        await page.waitForTimeout(1000);
-      }
-    }
+    // RSVP going button must be present
+    const goingBtn = page.getByRole('button', {
+      name: /going|accept|rsvp/i,
+    });
+    await expect(goingBtn).toBeVisible();
+    await goingBtn.click();
+
+    // Assert RSVP was recorded
+    await expect(page.getByText(/going/i).first()).toBeVisible();
   });
 
   // -----------------------------------------------------------------------
   // 5. Calendar shows the event
   // -----------------------------------------------------------------------
 
-  test('9. User A sees event on calendar', async ({ page }) => {
+  test('9. User A sees calendar page', async ({ page }) => {
     await login(page, userA.email, userA.password);
     await page.goto('/app/calendar');
     await page.waitForLoadState('networkidle');
 
-    // Calendar page should load successfully
     await expect(page).toHaveURL(/\/app\/calendar/);
+    // Calendar heading should be present
+    await expect(
+      page.getByRole('heading', { name: /calendar/i })
+    ).toBeVisible();
   });
 
-  test('10. User B sees event on calendar', async ({ page }) => {
+  test('10. User B sees calendar page', async ({ page }) => {
     await login(page, userB.email, userB.password);
     await page.goto('/app/calendar');
     await page.waitForLoadState('networkidle');
 
     await expect(page).toHaveURL(/\/app\/calendar/);
+    await expect(
+      page.getByRole('heading', { name: /calendar/i })
+    ).toBeVisible();
   });
 
   // -----------------------------------------------------------------------

@@ -206,7 +206,7 @@ describe('syncPull — Google → Koda', () => {
     expect(result.deleted).toBe(1);
   });
 
-  it('should skip all-day events with only date (no dateTime)', async () => {
+  it('should import all-day events using date as fallback when dateTime is absent', async () => {
     mockGoogleClient.listAllEvents.mockResolvedValue([
       {
         id: 'g-all-day',
@@ -224,8 +224,174 @@ describe('syncPull — Google → Koda', () => {
 
     const result = await syncPull('user-1');
 
-    // All-day events are imported (date is accepted as fallback)
+    // All-day events are imported (date field is accepted as fallback)
     expect(result.pulled).toBe(1);
+  });
+
+  it('should return error summary when Google API call fails', async () => {
+    mockGoogleClient.listAllEvents.mockRejectedValue(
+      new Error('Google API quota exceeded')
+    );
+
+    const result = await syncPull('user-1');
+
+    expect(result.pulled).toBe(0);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]).toContain('Google API quota exceeded');
+  });
+
+  it('should use default sync window when connection is null', async () => {
+    mockPrisma.googleCalendarConnection.findUnique.mockResolvedValue(null);
+    mockGoogleClient.listAllEvents.mockResolvedValue([]);
+
+    const result = await syncPull('user-1');
+
+    expect(result.pulled).toBe(0);
+    // Verify listAllEvents was still called (using defaults 30/90)
+    expect(mockGoogleClient.listAllEvents).toHaveBeenCalled();
+  });
+
+  it('should record error and continue when a single event fails during pull', async () => {
+    mockGoogleClient.listAllEvents.mockResolvedValue([
+      {
+        id: 'g-good',
+        summary: 'Good Event',
+        start: { dateTime: '2026-02-10T09:00:00Z' },
+        end: { dateTime: '2026-02-10T10:00:00Z' },
+        etag: '"etag-good"',
+        status: 'confirmed',
+      },
+      {
+        id: 'g-bad',
+        summary: 'Bad Event',
+        start: { dateTime: '2026-02-10T11:00:00Z' },
+        end: { dateTime: '2026-02-10T12:00:00Z' },
+        etag: '"etag-bad"',
+        status: 'confirmed',
+      },
+    ]);
+
+    // First event: no mapping, create succeeds
+    mockPrisma.googleEventMapping.findUnique
+      .mockResolvedValueOnce(null) // g-good lookup
+      .mockResolvedValueOnce(null); // g-bad lookup
+
+    mockPrisma.event.create
+      .mockResolvedValueOnce({ id: 'koda-good' }) // g-good create
+      .mockRejectedValueOnce(new Error('DB constraint error')); // g-bad fails
+
+    mockPrisma.googleEventMapping.create.mockResolvedValue({});
+
+    const result = await syncPull('user-1');
+
+    expect(result.pulled).toBe(1); // Only the good one
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]).toContain('g-bad');
+  });
+
+  it('should skip events with missing id', async () => {
+    mockGoogleClient.listAllEvents.mockResolvedValue([
+      {
+        id: null,
+        summary: 'No ID Event',
+        start: { dateTime: '2026-02-10T09:00:00Z' },
+        end: { dateTime: '2026-02-10T10:00:00Z' },
+        status: 'confirmed',
+      },
+    ]);
+
+    const result = await syncPull('user-1');
+
+    expect(result.pulled).toBe(0);
+    expect(mockPrisma.event.create).not.toHaveBeenCalled();
+  });
+
+  it('should skip events with missing start dateTime and date', async () => {
+    mockGoogleClient.listAllEvents.mockResolvedValue([
+      {
+        id: 'g-no-start',
+        summary: 'Missing Start',
+        start: {},
+        end: { dateTime: '2026-02-10T10:00:00Z' },
+        status: 'confirmed',
+      },
+    ]);
+
+    const result = await syncPull('user-1');
+
+    expect(result.pulled).toBe(0);
+    expect(mockPrisma.event.create).not.toHaveBeenCalled();
+  });
+
+  it('should no-op when cancelled event has no existing mapping', async () => {
+    mockGoogleClient.listAllEvents.mockResolvedValue([
+      {
+        id: 'g-cancelled-no-map',
+        status: 'cancelled',
+        start: { dateTime: '2026-02-10T09:00:00Z' },
+        end: { dateTime: '2026-02-10T10:00:00Z' },
+      },
+    ]);
+
+    // No mapping exists for this cancelled event
+    mockPrisma.googleEventMapping.findUnique.mockResolvedValue(null);
+
+    const result = await syncPull('user-1');
+
+    expect(result.deleted).toBe(0);
+    expect(mockPrisma.event.delete).not.toHaveBeenCalled();
+  });
+
+  it('should use Untitled when Google event has no summary', async () => {
+    mockGoogleClient.listAllEvents.mockResolvedValue([
+      {
+        id: 'g-no-title',
+        start: { dateTime: '2026-02-10T09:00:00Z' },
+        end: { dateTime: '2026-02-10T10:00:00Z' },
+        etag: '"etag-notitle"',
+        status: 'confirmed',
+      },
+    ]);
+
+    mockPrisma.googleEventMapping.findUnique.mockResolvedValue(null);
+    mockPrisma.event.create.mockResolvedValue({ id: 'koda-notitle' });
+    mockPrisma.googleEventMapping.create.mockResolvedValue({});
+
+    await syncPull('user-1');
+
+    expect(mockPrisma.event.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        title: 'Untitled',
+      }),
+    });
+  });
+
+  it('should handle null etag on mapping during loop prevention check', async () => {
+    mockGoogleClient.listAllEvents.mockResolvedValue([
+      {
+        id: 'g-event-null-etag',
+        summary: 'Event',
+        start: { dateTime: '2026-02-10T09:00:00Z' },
+        end: { dateTime: '2026-02-10T10:00:00Z' },
+        etag: '"new-etag"',
+        status: 'confirmed',
+      },
+    ]);
+
+    // Existing mapping with null etag should always update
+    mockPrisma.googleEventMapping.findUnique.mockResolvedValue({
+      id: 'mapping-null',
+      kodaEventId: 'koda-null-etag',
+      googleEtag: null,
+    });
+
+    mockPrisma.event.update.mockResolvedValue({});
+    mockPrisma.googleEventMapping.update.mockResolvedValue({});
+
+    const result = await syncPull('user-1');
+
+    expect(result.updated).toBe(1);
+    expect(mockPrisma.event.update).toHaveBeenCalled();
   });
 });
 
@@ -343,6 +509,263 @@ describe('syncPush — Koda → Google', () => {
     );
 
     expect(result.pushed).toBe(0);
+  });
+
+  it('should record error and continue when a single push fails', async () => {
+    mockPrisma.googleCalendarConnection.findUnique.mockResolvedValue({
+      pushEnabled: true,
+    });
+
+    mockPrisma.event.findMany.mockResolvedValue([
+      {
+        id: 'koda-fail',
+        title: 'Failing Event',
+        description: null,
+        locationName: null,
+        startAt: new Date('2026-02-12T14:00:00Z'),
+        endAt: new Date('2026-02-12T15:00:00Z'),
+        timezone: 'UTC',
+        source: 'KODA',
+        syncToGoogle: true,
+        updatedAt: new Date('2026-02-12T13:00:00Z'),
+        googleEventMapping: null,
+      },
+    ]);
+
+    mockPrisma.googleEventMapping.findMany.mockResolvedValue([]);
+    mockGoogleClient.insertEvent.mockRejectedValue(
+      new Error('Google API insert failed')
+    );
+
+    const result = await syncPush('user-1');
+
+    expect(result.pushed).toBe(0);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]).toContain('koda-fail');
+  });
+
+  it('should default to pushEnabled=false when connection is null', async () => {
+    mockPrisma.googleCalendarConnection.findUnique.mockResolvedValue(null);
+
+    // With globalPush=false, only syncToGoogle=true events are fetched
+    mockPrisma.event.findMany.mockResolvedValue([]);
+    mockPrisma.googleEventMapping.findMany.mockResolvedValue([]);
+
+    const result = await syncPush('user-1');
+
+    expect(result.pushed).toBe(0);
+    // Verify the query filters for syncToGoogle when pushEnabled is false
+    expect(mockPrisma.event.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          syncToGoogle: true,
+        }),
+      })
+    );
+  });
+
+  it('should push all KODA events when globalPush is enabled', async () => {
+    mockPrisma.googleCalendarConnection.findUnique.mockResolvedValue({
+      pushEnabled: true,
+    });
+
+    mockPrisma.event.findMany.mockResolvedValue([
+      {
+        id: 'koda-global',
+        title: 'Global Push Event',
+        description: 'desc',
+        locationName: 'loc',
+        startAt: new Date('2026-02-12T14:00:00Z'),
+        endAt: new Date('2026-02-12T15:00:00Z'),
+        timezone: 'UTC',
+        source: 'KODA',
+        syncToGoogle: false, // not per-event, but globalPush is on
+        updatedAt: new Date('2026-02-12T13:00:00Z'),
+        googleEventMapping: null,
+      },
+    ]);
+
+    mockPrisma.googleEventMapping.findMany.mockResolvedValue([]);
+
+    mockGoogleClient.insertEvent.mockResolvedValue({
+      id: 'g-global-1',
+      etag: '"etag-global"',
+      updated: '2026-02-12T14:00:00Z',
+    });
+
+    mockPrisma.googleEventMapping.create.mockResolvedValue({});
+
+    const result = await syncPush('user-1');
+
+    expect(result.pushed).toBe(1);
+    // Verify query did NOT include syncToGoogle filter (globalPush overrides)
+    expect(mockPrisma.event.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.not.objectContaining({
+          syncToGoogle: true,
+        }),
+      })
+    );
+  });
+
+  it('should skip event when globalPush is false and syncToGoogle is false', async () => {
+    mockPrisma.googleCalendarConnection.findUnique.mockResolvedValue({
+      pushEnabled: false,
+    });
+
+    // Even if findMany returns an event with syncToGoogle=false, the guard skips it
+    mockPrisma.event.findMany.mockResolvedValue([
+      {
+        id: 'koda-skip',
+        title: 'Should Skip',
+        startAt: new Date('2026-02-12T14:00:00Z'),
+        endAt: new Date('2026-02-12T15:00:00Z'),
+        timezone: 'UTC',
+        source: 'KODA',
+        syncToGoogle: false,
+        updatedAt: new Date('2026-02-12T13:00:00Z'),
+        googleEventMapping: null,
+      },
+    ]);
+
+    mockPrisma.googleEventMapping.findMany.mockResolvedValue([]);
+
+    const result = await syncPush('user-1');
+
+    expect(result.pushed).toBe(0);
+    expect(mockGoogleClient.insertEvent).not.toHaveBeenCalled();
+  });
+
+  it('should handle Google API returning null etag and updated on insert', async () => {
+    mockPrisma.googleCalendarConnection.findUnique.mockResolvedValue({
+      pushEnabled: true,
+    });
+
+    mockPrisma.event.findMany.mockResolvedValue([
+      {
+        id: 'koda-null-resp',
+        title: 'Null Response Fields',
+        description: null,
+        locationName: null,
+        startAt: new Date('2026-02-12T14:00:00Z'),
+        endAt: new Date('2026-02-12T15:00:00Z'),
+        timezone: 'UTC',
+        source: 'KODA',
+        syncToGoogle: true,
+        updatedAt: new Date('2026-02-12T13:00:00Z'),
+        googleEventMapping: null,
+      },
+    ]);
+
+    mockPrisma.googleEventMapping.findMany.mockResolvedValue([]);
+
+    // Google returns without etag or updated
+    mockGoogleClient.insertEvent.mockResolvedValue({
+      id: 'g-null-resp',
+    });
+
+    mockPrisma.googleEventMapping.create.mockResolvedValue({});
+
+    const result = await syncPush('user-1');
+
+    expect(result.pushed).toBe(1);
+    expect(mockPrisma.googleEventMapping.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        googleEtag: null,
+        googleUpdatedAt: null,
+      }),
+    });
+  });
+
+  it('should handle Google API returning null etag and updated on update', async () => {
+    const lastPush = new Date('2026-02-12T10:00:00Z');
+    const eventUpdate = new Date('2026-02-12T12:00:00Z');
+
+    mockPrisma.googleCalendarConnection.findUnique.mockResolvedValue({
+      pushEnabled: true,
+    });
+
+    mockPrisma.event.findMany.mockResolvedValue([
+      {
+        id: 'koda-upd-null',
+        title: 'Update Null Response',
+        description: null,
+        locationName: null,
+        startAt: new Date('2026-02-13T09:00:00Z'),
+        endAt: new Date('2026-02-13T10:00:00Z'),
+        timezone: 'UTC',
+        source: 'KODA',
+        syncToGoogle: true,
+        updatedAt: eventUpdate,
+        googleEventMapping: {
+          id: 'mapping-upd-null',
+          googleEventId: 'g-upd-null',
+          lastPushedAt: lastPush,
+        },
+      },
+    ]);
+
+    mockPrisma.googleEventMapping.findMany.mockResolvedValue([]);
+
+    // Google returns without etag or updated
+    mockGoogleClient.updateEvent.mockResolvedValue({
+      id: 'g-upd-null',
+    });
+
+    mockPrisma.googleEventMapping.update.mockResolvedValue({});
+
+    const result = await syncPush('user-1');
+
+    expect(result.updated).toBe(1);
+    expect(mockPrisma.googleEventMapping.update).toHaveBeenCalledWith({
+      where: { id: 'mapping-upd-null' },
+      data: expect.objectContaining({
+        googleEtag: null,
+        googleUpdatedAt: null,
+      }),
+    });
+  });
+
+  it('should push when mapping exists but lastPushedAt is null', async () => {
+    mockPrisma.googleCalendarConnection.findUnique.mockResolvedValue({
+      pushEnabled: true,
+    });
+
+    mockPrisma.event.findMany.mockResolvedValue([
+      {
+        id: 'koda-no-push-ts',
+        title: 'Never Pushed Before',
+        description: null,
+        locationName: null,
+        startAt: new Date('2026-02-13T09:00:00Z'),
+        endAt: new Date('2026-02-13T10:00:00Z'),
+        timezone: 'UTC',
+        source: 'KODA',
+        syncToGoogle: true,
+        updatedAt: new Date('2026-02-13T08:00:00Z'),
+        googleEventMapping: {
+          id: 'mapping-no-push',
+          googleEventId: 'g-no-push',
+          lastPushedAt: null, // Never pushed before
+        },
+      },
+    ]);
+
+    mockPrisma.googleEventMapping.findMany.mockResolvedValue([]);
+
+    mockGoogleClient.updateEvent.mockResolvedValue({
+      id: 'g-no-push',
+      etag: '"etag-first-push"',
+      updated: '2026-02-13T09:01:00Z',
+    });
+
+    mockPrisma.googleEventMapping.update.mockResolvedValue({});
+
+    const result = await syncPush('user-1');
+
+    // Should update (not skip) because lastPushedAt is null
+    expect(result.updated).toBe(1);
+    expect(mockGoogleClient.updateEvent).toHaveBeenCalled();
   });
 
   it('should update existing Google event when Koda event changed', async () => {
