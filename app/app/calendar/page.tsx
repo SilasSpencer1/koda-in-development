@@ -173,6 +173,7 @@ export default function CalendarPage() {
       timezone: data.timezone,
       visibility: data.visibility,
       coverMode: data.coverMode,
+      syncToGoogle: data.syncToGoogle,
     };
 
     const res = await fetch('/api/events', {
@@ -223,6 +224,7 @@ export default function CalendarPage() {
       timezone: data.timezone,
       visibility: data.visibility,
       coverMode: data.coverMode,
+      syncToGoogle: data.syncToGoogle,
     };
 
     const res = await fetch(`/api/events/${eventId}`, {
