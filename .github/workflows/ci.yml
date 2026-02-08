@@ -102,11 +102,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Push database schema
-        run: npx prisma db push --skip-generate
-
-      - name: Generate Prisma client
-        run: pnpm db:generate
+      - name: Push database schema and generate client
+        run: npx prisma db push
 
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
