@@ -16,7 +16,7 @@ export const profileUpdateSchema = z.object({
 });
 
 export const avatarSaveSchema = z.object({
-  avatarUrl: z.string().url('Invalid avatar URL'),
+  avatarUrl: z.string().url('Invalid avatar URL').nullable(),
 });
 
 export const privacyUpdateSchema = z.object({

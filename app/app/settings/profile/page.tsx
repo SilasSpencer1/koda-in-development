@@ -50,7 +50,7 @@ export default function ProfileSettingsPage() {
       }
     }
     load();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [toast]);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -169,6 +169,7 @@ export default function ProfileSettingsPage() {
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
+            aria-label="Change profile photo"
             className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full border border-gray-300 bg-white shadow-sm hover:bg-gray-50 disabled:opacity-50"
           >
             <Camera className="h-4 w-4 text-gray-600" />

@@ -31,7 +31,7 @@ export default function NotificationsSettingsPage() {
       }
     }
     load();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [toast]);
 
   const handleSave = async () => {
     setSaving(true);

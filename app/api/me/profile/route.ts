@@ -11,7 +11,13 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+
     const data = profileUpdateSchema.parse(body);
 
     // Check username uniqueness if provided
@@ -27,13 +33,18 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
+    // Only update fields that were explicitly provided
+    const updateData: Record<string, unknown> = { name: data.name };
+    if (data.username !== undefined) {
+      updateData.username = data.username ?? null;
+    }
+    if (data.city !== undefined) {
+      updateData.city = data.city ?? null;
+    }
+
     const updated = await prisma.user.update({
       where: { id: session.user.id },
-      data: {
-        name: data.name,
-        username: data.username ?? null,
-        city: data.city ?? null,
-      },
+      data: updateData,
       select: {
         id: true,
         email: true,
